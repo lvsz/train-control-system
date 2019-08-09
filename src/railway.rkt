@@ -39,6 +39,8 @@
       (hash-ref blocks id))
     (define/public (get-blocks)
       (hash-values blocks))
+    (define/public (get-block-ids)
+      (hash-keys blocks))
 
     (define/public (get-loco id)
       (hash-ref locos id))
