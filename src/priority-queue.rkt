@@ -14,36 +14,30 @@
 
 (define modifiable-heap%
   (class object%
-    (init-field <<? elems)
-    (field (storage (if (null? elems)
-                      (make-gvector)
-                      (list->gvector elems))))
+    (init-field <<?)
+    (field (storage (make-gvector)))
     (super-new)
-
-    (define/public (len) (gvector-count storage))
 
     (define notify void)
 
     (define (get i)
       (gvector-ref storage (sub1 i)))
 
-    (define (store! i a fn)
+    (define (store! i a)
       (gvector-set! storage (sub1 i) a)
-      (fn i a))
+      (notify i a))
 
-    (define (sift-up idx fn)
-      (set! notify fn)
+    (define (sift-up idx)
       (let sift-iter ((child idx) (element (get idx)))
         (let ((parent (quotient child 2)))
           (cond ((zero? parent)
-                 (store! child element fn))
+                 (store! child element))
                 ((<<? element (get parent))
-                 (store! child (get parent) fn)
+                 (store! child (get parent))
                  (sift-iter parent element))
-                (else (store! child element fn))))))
+                (else (store! child element))))))
 
-    (define (sift-down idx fn)
-      (set! notify fn)
+    (define (sift-down idx)
       (let ((size (gvector-count storage)))
         (let sift-iter ((parent idx) (element (get idx)))
           (let* ((childL (* 2 parent))
@@ -62,8 +56,8 @@
                                     childL))
                                  (else parent))))
             (if (= smallest parent)
-              (store! parent element fn)
-              (begin (store! parent (get smallest) fn)
+              (store! parent element)
+              (begin (store! parent (get smallest))
                      (sift-iter smallest element)))))))
 
     (define/public (empty?)
@@ -74,7 +68,7 @@
       (gvector-add! storage item)
       (let ((size (gvector-count storage)))
         (if (> size 1)
-          (sift-up size fn)
+          (sift-up size)
           (notify 1 item))))
 
     (define/public (delete! fn)
@@ -85,10 +79,9 @@
              (last (gvector-remove-last! storage)))
         (if (empty?)
           (notify 1 last)
-          (begin (store! 1 last fn)
-                 (sift-down 1 fn)))
+          (begin (store! 1 last)
+                 (sift-down 1)))
         first))
-
 
     (define/public (peek)
       (when (empty?)
@@ -103,16 +96,13 @@
       (let ((parent (quotient idx 2))
             (size (gvector-count storage)))
         (cond ((= idx 1)
-               (sift-down idx fn))
+               (sift-down idx))
               ((= idx size)
-               (sift-up idx fn))
+               (sift-up idx))
               ((<<? (get parent) (get idx))
-               (sift-down idx fn))
+               (sift-down idx))
               (else
-               (sift-up idx fn)))))
-    (when (> (gvector-count storage) 1)
-      (for ((i (in-range (quotient (gvector-count storage) 2) 0 -1)))
-        (sift-down i notify)))))
+               (sift-up idx)))))))
 
 (struct item (value (priority #:mutable)) #:transparent)
 
@@ -128,10 +118,8 @@
   (lambda (idx item)
     (notify idx (item-value item) (item-priority item))))
 
-(define (priority-queue <<? . elems)
-  (make-object modifiable-heap%
-               (on item-priority <<?)
-               (map pair->item elems)))
+(define (priority-queue <<?)
+  (make-object modifiable-heap% (on item-priority <<?)))
 
 (define (queue-empty? pq)
   (send pq empty?))
