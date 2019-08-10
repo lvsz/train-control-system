@@ -60,16 +60,20 @@
         (let ((node (make-object node% id)))
           (hash-set! nodes id node)
           node)))
+
     (define (add-track id n1 n2 length)
       (hash-set! tracks id (make-object track% id n1 n2 length)))
+
     (define (add-switch id current alternative)
       (let ((switch (make-object switch% id current alternative)))
         (hash-set! tracks id switch)
         (hash-set! switches id switch)))
+
     (define (add-block id n1 n2 length)
       (let ((block (make-object block% id n1 n2 length)))
         (hash-set! tracks id block)
         (hash-set! blocks id block)))
+
     (define (add-loco id track)
       (hash-set! locos id (make-object loco% id track)))
 
