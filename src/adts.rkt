@@ -12,55 +12,103 @@
   (class object%
     (init-field id)
     (super-new)
-    (define/public (get-id) id)
+    ; list of tracks connected to this node
     (define tracks '())
+
+    (define/public (get-id)
+      id)
+
     (define/public (get-tracks)
       tracks)
+
+    ; add a track (but prevent duplicates)
     (define/public (add-track track)
       (set! tracks (set-union (list track) tracks)))
+
+    ; remove a track
     (define/public (remove-track track)
       (set! tracks (remq track tracks)))
+
+    ; given a track, return the other track if it exists
+    ; only used by track%
     (define/public (from track)
-      (if (and (pair? tracks) (pair? (cdr tracks)))
-        (car (remq track tracks))
-        #f))))
+      (cond ((and (not (memq track tracks)))
+             (let ((switch (get-field master-switch track)))
+               (if switch
+                 (from switch)
+                 (error (format "node ~a does not connect to track ~a" id (send track get-id))))))
+            ((and (pair? tracks) (pair? (cdr tracks)))
+             (car (remq track tracks)))
+            (else #f)))
+
+    ))
 
 (define track%
   (class object%
     (init-field id node-1 node-2 length)
+    (field (master-switch #f))
     (super-new)
     (send node-1 add-track this)
     (send node-2 add-track this)
-    (define/public (get-id) id)
+
+    (define/public (get-id)
+      id)
+
     (define/public (get-length)
       length)
+
     (define/public (get-nodes)
       (values node-1 node-2))
+
     (define/public (from node)
       (cond ((eq? node node-1) node-2)
             ((eq? node node-2) node-1)
             (else #f)))
+
     (define/public (get-connected-tracks)
       (filter identity
               (map (lambda (n)
                      (send n from this))
-                   (list node-1 node-2))))))
+                   (list node-1 node-2))))
+
+    (define/public (connected? track)
+      (let ((node-3 (get-field node-1 track))
+            (node-4 (get-field node-2 track)))
+        (or (eq? node-1 node-3)
+            (eq? node-1 node-4)
+            (eq? node-2 node-3)
+            (eq? node-2 node-4))))
+
+
+    (define/public (get-master-switch)
+      master-switch)
+
+    (define/public (switch-override switch)
+      (send node-1 remove-track (or master-switch this))
+      (send node-1 add-track switch)
+      (send node-2 remove-track (or master-switch this))
+      (send node-2 add-track switch)
+      (set! master-switch switch))))
 
 (define block%
   (class track%
     (init id node-1 node-2 length)
     (field (status 'green))
     (super-make-object id node-1 node-2 length)
+
     (define connected-blocks
       (for/list ((track (in-list (list (send node-1 from this)
                                        (send node-2 from this))))
                  #:when (is-a? track block%))
         (send track connect-block this)
         track))
+
     (define/public (connect-block block)
       (set! connected-blocks (cons block connected-blocks)))
+
     (define/public (get-status)
       status)
+
     (define/public (set-status new-status)
       (case new-status
         ((red) (set! status 'red)
@@ -79,38 +127,23 @@
   (class track%
     (init id)
     (init-field position-1 position-2)
+    (inherit-field master-switch)
     (super-make-object id
                        (get-field node-1 position-1)
                        (get-field node-2 position-1)
                        (get-field length position-1))
-    ;TODO this can probably be done better node's in the remove-track method.
-    (send (get-field node-1 position-1) remove-track position-1)
-    (send (get-field node-2 position-1) remove-track position-1)
-    (define n3 (get-field node-1 position-2))
-    (define n4 (get-field node-2 position-2))
-    (send n3 remove-track position-2)
-    (send n4 remove-track position-2)
-    (send n3 add-track this)
-    (send n4 add-track this)
 
-    (define/public (remove-from-nodes)
-      (for-each (lambda (n)
-                  (send n remove-track this))
-                (list (get-field node-1 position-1)
-                      (get-field node-2 position-1)
-                      (get-field node-1 position-2)
-                      (get-field node-2 position-2))))
+    (send position-1 switch-override this)
+    (send position-2 switch-override this)
 
-    (when (is-a? position-1 switch%)
-      (send position-1
-            set-internal-callback
-            (lambda () (send this set-position 1)))
-      (send position-1 remove-from-nodes))
-    (when (is-a? position-2 switch%)
-      (send position-2
-            set-internal-callback
-            (lambda () (send this set-position 2)))
-      (send position-2 remove-from-nodes))
+    (define/override (switch-override switch)
+      (set! master-switch switch)
+      (send position-1 switch-override switch)
+      (send position-2 switch-override switch)
+      (set! adjust-master-switch
+           (if (eq? (get-field position-1 switch) this)
+             (lambda () (send switch set-position 1))
+             (lambda () (send switch set-position 2)))))
 
     (define position 1)
 
@@ -126,6 +159,14 @@
     (define/override (get-connected-tracks)
       (send (current) get-connected-tracks))
 
+    (define/public (get-positions)
+      (flatten (list (if (is-a? position-1 switch%)
+                       (send position-1 get-positions)
+                       position-1)
+                     (if (is-a? position-2 switch%)
+                       (send position-2 get-positions)
+                       position-2))))
+
     (define/public (options-from node)
       (filter identity
               (flatten (map (lambda (track)
@@ -134,23 +175,26 @@
                                 (send track from node)))
                             (list position-1 position-2)))))
 
-    ;(define/public (has? track)
-    ;  (or (eq? position-1 track)
-    ;      (eq? position-2 track)
-    ;      (and (is-a? position-1 switch%) (send position-1 has? track))
-    ;      (and (is-a? position-2 switch%) (send position-2 has? track))))
+    (define/public (options-from-track track)
+      (filter (lambda (t) (send t connected? track)) (get-positions)))
+
+    (define/public (has? track)
+      (or (eq? position-1 track)
+          (eq? position-2 track)
+          (and (is-a? position-1 switch%) (send position-1 has? track))
+          (and (is-a? position-2 switch%) (send position-2 has? track))))
 
     (define/public (get-position)
       position)
 
-    (define internal-callback void)
-    (define/public (set-internal-callback f)
-      (set! internal-callback f))
+    (define adjust-master-switch void)
+
     (define callback void)
     (define/public (set-callback f)
       (set! callback f))
+
     (define/public (set-position int)
-      (internal-callback)
+      (adjust-master-switch)
       (set! position int)
       (callback))
 
@@ -164,6 +208,22 @@
         (send (current) get-current-track)
         (current)))
 
+    (define/public (set-current-track track)
+      (cond ((eq? position-1 track)
+             (set-position 1))
+            ((eq? position-2 track)
+             (set-position 2))
+            ((and (is-a? position-1 switch%)
+                  (send position-1 has? track))
+             ; will automatically change position of this track
+             ; through internal-callback
+             (send position-1 set-current-track track))
+            ((and (is-a? position-2 switch%)
+                  (send position-2 has? track))
+             (send position-2 set-current-track track))
+            (else
+              (error "Switch doesn't contain track: ") (send track get-id))))
+
     (define/public (change-position)
       (if (= position 1)
         (set-position 2)
@@ -175,6 +235,7 @@
     (init-field id previous-segment starting-segment (speed 0))
     (super-new)
     (define location starting-segment)
+    ;(displayln (cons (send previous-segment get-id) (send starting-segment get-id)))
     (define/public (get-id)
       id)
     (define/public (get-location)
