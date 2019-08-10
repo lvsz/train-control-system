@@ -4,11 +4,27 @@
          racket/list
          racket/set
          "railway.rkt"
-         "setup.rkt")
+         "setup.rkt"
+         "adts.rkt"
+         rnrs/mutable-pairs-6
+         (prefix-in pq: a-d/priority-queue/modifiable-heap))
 
 (provide nmbs%
          starting-spot%)
 
+;; METHODS:
+; initialize
+; get-loco-ids
+; get-switch-ids
+; get-track-ids
+; get-switch-position
+; set-switch-position
+; change-switch-posiiton
+; add-loco
+; get-loco-detection-block
+; get-loco-speed
+; set-loco-speed
+; get-starting-spots
 (define nmbs%
   (class object%
     (init-field infrabel)
@@ -50,6 +66,8 @@
     (define/public (get-track id)
       (send railway get-track id))
 
+    (define/public (get-loco-detection-block id)
+      (send infrabel get-loco-detection-block id))
     (define/public (get-loco-speed id)
       (send (send railway get-loco id) get-speed))
     (define/public (set-loco-speed id speed)
@@ -58,12 +76,34 @@
 
     (define/public (add-loco id starting-spot)
       (let ((curr-id (get-field current-track starting-spot))
-            (prev-id (get-field previous-track starting-spot)))
-      (send infrabel add-loco id prev-id curr-id)
-      (send railway add-loco id (get-track prev-id) (get-track curr-id))))
+            (next-id (get-field next-track starting-spot)))
+        ;(let ((x (route (get-track '2-7))))
+          ;(for-each displayln (car x))
+          ;(displayln '--------------)
+          ;(displayln (cdr x)))
+        (send infrabel add-loco id next-id curr-id)
+        (send railway add-loco id (get-track next-id) (get-track curr-id))))
+
+
+      ;(define start-track (send railway get-track start))
+      ;(define end-track (send railway get-track end))
+      ;(define-values ((start-node-1 start-node-2) (send start-track get-nodes)))
+      ;(define-values ((end-node-1 end-node-2) (send end-track get-nodes)))
+      ;(define nodes (send railway get-nodes))
+      ;(define distances (make-hash (map (lambda (n) (cons n +inf.0)) nodes)))
+      ;(define prevs (make-hash (map (lambda (n) (cons n #f)) nodes)))
+
+      ;(define (for-each-track from fn)
+      ;  (let ((tracks (send from get-tracks)))
+      ;    ()))
+
+      ;(hash-set! distances start-node-1 0)
+      ;(hash-set! distances start-node-2 0)
+
+      ;void)
 
     ;; get list of spots where a new loco can be added
-    ;; to be a valid spot, 2 connected tracks are needed whose
+    ;; to be a valid spot, 2 connected detection blocks are needed whose
     ;; local ids match those imported through infrabel
     (define (find-starting-spots)
       (let ((infrabel-ids (send infrabel get-detection-block-ids)))
@@ -94,8 +134,58 @@
 ;; and a connected track to determine its direction
 (define starting-spot%
   (class object%
-    (init-field current-track previous-track)
+    (init-field current-track next-track)
     (super-new)
     (define/public (get-id)
       current-track)))
+      ;(string->symbol (format "~a → ~a" current-track next-track)))))
 
+(define route%
+  (class object%
+    (init-field railway start)
+    (super-new)
+    (define tracks (filter (lambda (t) (not (is-a? t switch%)))
+                           (send railway get-tracks)))
+    ;(printf "evaluating tracks ~a~%" (map (lambda (x) (send x get-id)) tracks))
+    (define distances (make-hash (map (lambda (t) (cons t +inf.0)) tracks)))
+    (define how-to-reach (make-hash (map (lambda (t) (cons t '())) tracks)))
+    (define pq-ids (make-hash (map (lambda (t) (cons t '())) tracks)))
+    (define (track-ids pq-id track distance)
+      (hash-set! pq-ids track pq-id))
+    (define (pq-id-of track)
+      (hash-ref pq-ids track))
+    (define pq (pq:new (length tracks) <))
+    (define (relax! from to)
+      ;(printf "relaxing from ~a to ~a~%" (send from get-id) (send to get-id))
+      (let* ((tos (if (is-a? to switch%)
+                    (send to options-from-track from)
+                    (list to)))
+             (weights (map (lambda (t) (send t get-length)) tos)))
+        (for-each (lambda (a-to weight)
+                    (when (< (+ (hash-ref distances from) weight)
+                             (hash-ref distances a-to))
+                      (hash-set! distances a-to (+ (hash-ref distances from) weight))
+                      (hash-set! how-to-reach a-to from))
+                    (pq:reschedule! pq (pq-id-of a-to) (hash-ref distances a-to) track-ids))
+                  tos
+                  weights)))
+    (hash-set! distances start 0)
+    (for-each (lambda (track)
+                (pq:enqueue! pq track +inf.0 track-ids))
+              tracks)
+    (pq:reschedule! pq (pq-id-of start) 0 track-ids)
+    (let loop ((track&distance (pq:serve! pq track-ids)))
+      ;(printf "distance from start: ~a~%" (hash-ref distances start))
+      (let ((from (mcar track&distance))
+            (distance (mcdr track&distance)))
+        ;(printf "loop with ~a~%" (send from get-id))
+        (for-each (lambda (to)
+                    (relax! from to))
+                  (send from get-connected-tracks)))
+      (unless (pq:empty? pq)
+        (loop (pq:serve! pq track-ids))))
+    (define route
+      (cons (map (lambda (x) (cons (send (or (send (car x) get-master-switch) (car x)) get-id) (if (null? (cdr x)) '() (send (or (send (cdr x) get-master-switch) (cdr x)) get-id)))) (hash->list how-to-reach))
+            (map (lambda (x) (cons (send (car x) get-id) (cdr x))) (hash->list distances))))
+    (define/public (get-route)
+      route)))
