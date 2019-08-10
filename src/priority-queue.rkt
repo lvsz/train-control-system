@@ -1,0 +1,166 @@
+#lang racket/base
+
+(provide priority-queue
+         queue-empty?
+         enqueue!
+         serve!
+         reschedule!
+         queue-peek
+         queue-peek-at
+         priority-of)
+
+(require racket/class
+         data/gvector)
+
+(define modifiable-heap%
+  (class object%
+    (init-field <<? elems)
+    (field (storage (if (null? elems)
+                      (make-gvector)
+                      (list->gvector elems))))
+    (super-new)
+
+    (define/public (len) (gvector-count storage))
+
+    (define notify void)
+
+    (define (get i)
+      (gvector-ref storage (sub1 i)))
+
+    (define (store! i a fn)
+      (gvector-set! storage (sub1 i) a)
+      (fn i a))
+
+    (define (sift-up idx fn)
+      (set! notify fn)
+      (let sift-iter ((child idx) (element (get idx)))
+        (let ((parent (quotient child 2)))
+          (cond ((zero? parent)
+                 (store! child element fn))
+                ((<<? element (get parent))
+                 (store! child (get parent) fn)
+                 (sift-iter parent element))
+                (else (store! child element fn))))))
+
+    (define (sift-down idx fn)
+      (set! notify fn)
+      (let ((size (gvector-count storage)))
+        (let sift-iter ((parent idx) (element (get idx)))
+          (let* ((childL (* 2 parent))
+                 (childR (add1 childL))
+                 (smallest (cond ((< childL size)
+                                  (if (<<? (get childL) (get childR))
+                                    (if (<<? element (get childL))
+                                      parent
+                                      childL)
+                                    (if (<<? element (get childR))
+                                      parent
+                                      childR)))
+                                 ((= childL size)
+                                  (if (<<? element (get childL))
+                                    parent
+                                    childL))
+                                 (else parent))))
+            (if (= smallest parent)
+              (store! parent element fn)
+              (begin (store! parent (get smallest) fn)
+                     (sift-iter smallest element)))))))
+
+    (define/public (empty?)
+      (zero? (gvector-count storage)))
+
+    (define/public (insert! item fn)
+      (set! notify fn)
+      (gvector-add! storage item)
+      (let ((size (gvector-count storage)))
+        (if (> size 1)
+          (sift-up size fn)
+          (notify 1 item))))
+
+    (define/public (delete! fn)
+      (when (empty?)
+        (error "Heap empty" this))
+      (set! notify fn)
+      (let* ((first (get 1))
+             (last (gvector-remove-last! storage)))
+        (if (empty?)
+          (notify 1 last)
+          (begin (store! 1 last fn)
+                 (sift-down 1 fn)))
+        first))
+
+
+    (define/public (peek)
+      (when (empty?)
+        (error "Heap empty" this))
+      (get 1))
+
+    (define/public (peek-at idx)
+      (get idx))
+
+    (define/public (touch-at! idx fn)
+      (set! notify fn)
+      (let ((parent (quotient idx 2))
+            (size (gvector-count storage)))
+        (cond ((= idx 1)
+               (sift-down idx fn))
+              ((= idx size)
+               (sift-up idx fn))
+              ((<<? (get parent) (get idx))
+               (sift-down idx fn))
+              (else
+               (sift-up idx fn)))))
+    (when (> (gvector-count storage) 1)
+      (for ((i (in-range (quotient (gvector-count storage) 2) 0 -1)))
+        (sift-down i notify)))))
+
+(struct item (value (priority #:mutable)) #:transparent)
+
+(define (pair->item x)
+  (item (car x) (cdr x)))
+
+(define (on accessor cmp)
+  (lambda (x y)
+    (cmp (accessor x)
+         (accessor y))))
+
+(define (pq-notify notify)
+  (lambda (idx item)
+    (notify idx (item-value item) (item-priority item))))
+
+(define (priority-queue <<? . elems)
+  (make-object modifiable-heap%
+               (on item-priority <<?)
+               (map pair->item elems)))
+
+(define (queue-empty? pq)
+  (send pq empty?))
+
+(define (enqueue! pq value priority notify)
+  (send pq insert! (item value priority) (pq-notify notify)))
+
+(define (serve! pq notify)
+  (when (send pq empty?)
+    (error "serve!: empty priority queue" pq))
+  (let ((item (send pq delete! (pq-notify notify))))
+    (values (item-value item) (item-priority item))))
+
+(define (reschedule! pq idx new-priority notify)
+  (let ((pq-item (send pq peek-at idx)))
+    (set-item-priority! pq-item new-priority)
+    (send pq touch-at! idx (pq-notify notify))))
+
+(define (queue-peek pq)
+  (when (send pq empty?)
+    (error "queue-peek: empty priority queue" pq))
+  (item-value (send pq peek)))
+
+(define (queue-peek-at pq idx)
+  (when (send pq empty?)
+    (error "queue-peek-at: empty priority queue" pq))
+  (item-value (send pq peek-at idx)))
+
+(define (priority-of pq idx)
+  (when (send pq empty?)
+    (error "priority-of: empty priority queue" pq))
+  (item-priority (send pq peek-at idx)))

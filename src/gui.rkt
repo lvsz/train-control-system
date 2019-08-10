@@ -1,7 +1,5 @@
 #lang racket/gui
 
-(require "nmbs.rkt")
-
 (provide setup-window%)
 
 ;; maximum loco speed allowed by controller

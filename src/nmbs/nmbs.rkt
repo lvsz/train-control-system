@@ -3,11 +3,10 @@
 (require racket/class
          racket/list
          racket/set
-         "railway.rkt"
-         "setup.rkt"
-         "adts.rkt"
-         rnrs/mutable-pairs-6
-         (prefix-in pq: a-d/priority-queue/modifiable-heap))
+         "../railway.rkt"
+         "../setup.rkt"
+         "../adts.rkt"
+         "../priority-queue.rkt")
 
 (provide nmbs%
          starting-spot%)
@@ -77,10 +76,6 @@
     (define/public (add-loco id starting-spot)
       (let ((curr-id (get-field current-track starting-spot))
             (next-id (get-field next-track starting-spot)))
-        ;(let ((x (route (get-track '2-7))))
-          ;(for-each displayln (car x))
-          ;(displayln '--------------)
-          ;(displayln (cdr x)))
         (send infrabel add-loco id next-id curr-id)
         (send railway add-loco id (get-track next-id) (get-track curr-id))))
 
@@ -154,9 +149,8 @@
       (hash-set! pq-ids track pq-id))
     (define (pq-id-of track)
       (hash-ref pq-ids track))
-    (define pq (pq:new (length tracks) <))
+    (define pq (priority-queue < ))
     (define (relax! from to)
-      ;(printf "relaxing from ~a to ~a~%" (send from get-id) (send to get-id))
       (let* ((tos (if (is-a? to switch%)
                     (send to options-from-track from)
                     (list to)))
@@ -166,26 +160,27 @@
                              (hash-ref distances a-to))
                       (hash-set! distances a-to (+ (hash-ref distances from) weight))
                       (hash-set! how-to-reach a-to from))
-                    (pq:reschedule! pq (pq-id-of a-to) (hash-ref distances a-to) track-ids))
+                    (unless (queue-empty? pq)
+                      (reschedule! pq (pq-id-of a-to) (hash-ref distances a-to) track-ids)))
                   tos
                   weights)))
     (hash-set! distances start 0)
     (for-each (lambda (track)
-                (pq:enqueue! pq track +inf.0 track-ids))
+                (enqueue! pq track +inf.0 track-ids))
               tracks)
-    (pq:reschedule! pq (pq-id-of start) 0 track-ids)
-    (let loop ((track&distance (pq:serve! pq track-ids)))
+    (reschedule! pq (pq-id-of start) 0 track-ids)
+    (let loop ()
       ;(printf "distance from start: ~a~%" (hash-ref distances start))
-      (let ((from (mcar track&distance))
-            (distance (mcdr track&distance)))
+      (let-values (((from distance) (serve! pq track-ids)))
         ;(printf "loop with ~a~%" (send from get-id))
         (for-each (lambda (to)
                     (relax! from to))
                   (send from get-connected-tracks)))
-      (unless (pq:empty? pq)
-        (loop (pq:serve! pq track-ids))))
+      (unless (queue-empty? pq)
+        (loop)))
     (define route
       (cons (map (lambda (x) (cons (send (or (send (car x) get-master-switch) (car x)) get-id) (if (null? (cdr x)) '() (send (or (send (cdr x) get-master-switch) (cdr x)) get-id)))) (hash->list how-to-reach))
             (map (lambda (x) (cons (send (car x) get-id) (cdr x))) (hash->list distances))))
     (define/public (get-route)
       route)))
+

@@ -1,7 +1,7 @@
 #lang racket/base
 
 (require racket/class
-         "nmbs.rkt"
+         "nmbs/nmbs.rkt"
          "infrabel.rkt"
          "gui.rkt"
          "setup.rkt")
