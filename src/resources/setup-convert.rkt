@@ -48,7 +48,7 @@
            (track-1 (switch-track-1 switch))
            (track-2 (switch-track-2 switch)))
       (set-switch-track-1! switch track-2)
-      (set-switch-track-2! switch track-2)
+      (set-switch-track-2! switch track-1)
       switch)))
 
 (define (id-exists? id)
