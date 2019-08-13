@@ -126,6 +126,7 @@
 
     ; list that keeps all loco ids
     (define loco-list '())
+    (define loco-speeds (make-hash))
 
     ; no active loco when there are no locos
     ; otherwise default to first one in list
@@ -144,6 +145,12 @@
            (callback (lambda (loco-id)
                        ; new loco is added, get updated list first
                        (set! loco-list (send nmbs get-loco-ids))
+                       ; update loco speeds
+                       (for-each (lambda (loco)
+                                   (hash-set! loco-speeds
+                                              loco
+                                              (send nmbs get-loco-speed loco)))
+                                 loco-list)
                        ; get selection menu to include new loco
                        (send loco-select-menu add-loco loco-id)
                        ; set new loco to active loco
@@ -159,13 +166,13 @@
                        (set! active-loco loco-id)
                        ; update speed controller to show selected loco's speed
                        (send speed-control set-value
-                             (send nmbs get-loco-speed active-loco))))))
+                             (hash-ref loco-speeds loco-id))))))
 
     ; initialize slider to control the active loco's speed
     (define speed-control
       (new slider%
            (label "Speed")
-           (min-value (- max-speed))
+           (min-value 0)
            (max-value max-speed)
            (parent this)
            (vert-margin 100)
@@ -177,6 +184,13 @@
                (when active-loco
                  (send nmbs set-loco-speed active-loco
                        (send slider get-value)))))))
+
+    (define (loco-speed-changed id speed)
+      (hash-set! loco-speeds id speed)
+      (when (eq? id active-loco)
+        (send speed-control set-value speed)))
+
+    (send nmbs add-loco-speed-listener loco-speed-changed)
 
     (define detection-blocks
       (sort (send nmbs get-detection-block-ids) id<?))

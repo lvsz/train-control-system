@@ -11,6 +11,7 @@
 (define (main (setup-id #f))
   (when (> (vector-length (current-command-line-arguments)) 0)
     (set! setup-id (string->symbol (vector-ref (current-command-line-arguments) 0))))
+
   ;; define infrabel
   (define infrabel
     (new infrabel%))
@@ -26,8 +27,9 @@
   ;; create window & run application
   (void (cond (setup-id
                 (send nmbs initialize (get-setup setup-id))
+                (thread (lambda ()
                 (new window% (nmbs nmbs)
-                     (atexit (lambda () (send infrabel stop)))))
+                     (atexit (lambda () (send infrabel stop)))))))
               (else
                 (new setup-window%
                      (nmbs nmbs)
