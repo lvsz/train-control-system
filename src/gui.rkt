@@ -1,6 +1,6 @@
 #lang racket/gui
 
-(provide setup-window%)
+(provide setup-window% window%)
 
 ;; maximum loco speed allowed by controller
 (define max-speed 300)
@@ -215,7 +215,6 @@
            (callback (lambda ()
                        (new window%
                             (nmbs nmbs)
-                            (setups setups)
                             (atexit atexit))
                        (show #f)))))
     (inherit show)
@@ -223,7 +222,7 @@
 
 (define window%
   (class frame%
-    (init-field nmbs setups (atexit void))
+    (init-field nmbs (atexit void))
     (init (width 400) (height 400))
     (super-new (label "NMBS")
                (width width)
