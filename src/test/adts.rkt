@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require racket/class
+         racket/set
          rackunit
          rackunit/text-ui
          "../adts.rkt")
@@ -12,19 +13,30 @@
 (define n5 (make-object node% 'n5))
 (define n6 (make-object node% 'n6))
 (define n7 (make-object node% 'n7))
-(define nodes (list n1 n2 n3 n4 n5 n6 n7))
+(define n8 (make-object node% 'n8))
+(define n9 (make-object node% 'n9))
+(define nodes (list n1 n2 n3 n4 n5 n6 n7 n8 n9))
 
-(define t-n1-n2 (make-object track% 't-n1-n2 n1 n2 100))
-(define b-n2-n3 (make-object block% 'b-n2-n3 n2 n3 200))
+;      n1============n2
+;       \            /
+;  n6----}n5--n4--n3(
+;  ||   /            \
+;  n7==n8            n9
+
+(define b-n1-n2 (make-object block% 'b-n1-n2 n1 n2 500))
+(define t-n2-n3 (make-object block% 't-n2-n3 n2 n3 200))
 (define t-n3-n4 (make-object track% 't-n3-n4 n3 n4 100))
-(define t-n4-n1 (make-object track% 't-n4-n1 n1 n4 300)) ; order of given nodes shouldn't matter
-(define t-n4-n5 (make-object track% 't-n4-n5 n4 n5 50))
-(define b-n5-n6 (make-object block% 'b-n5-n6 n5 n6 50))
+(define t-n4-n5 (make-object track% 't-n4-n5 n4 n5 100))
+(define t-n5-n1 (make-object track% 't-n5-n1 n1 n5 200)) ; order of given nodes shouldn't matter
+(define t-n5-n6 (make-object track% 't-n5-n6 n5 n6 50))
 (define b-n6-n7 (make-object block% 'b-n6-n7 n6 n7 50))
-(define s-n4<n1-n5 (make-object switch% 's-n4<n1-n5 t-n4-n1 t-n4-n5))
-(define t-n4-n7 (make-object track% 't-n4-n7 n4 n7 50))
-(define s-n4<n1-n5-n7 (make-object switch% 's-n4<n1-n5-n7 s-n4<n1-n5 t-n4-n7))
-(define tracks (list t-n1-n2 b-n2-n3 t-n3-n4 t-n4-n1 t-n4-n5 b-n5-n6 b-n6-n7 s-n4<n1-n5 t-n4-n7 s-n4<n1-n5-n7))
+(define b-n7-n8 (make-object block% 'b-n7-n8 n7 n8 50))
+(define s-n5<n1-n6 (make-object switch% 's-n5<n1-n6 t-n5-n1 t-n5-n6))
+(define t-n5-n8 (make-object track% 't-n5-n8 n5 n8 50))
+(define s-n5<n1-n6-n8 (make-object switch% 's-n5<n1-n6-n8 s-n5<n1-n6 t-n5-n8))
+(define t-n3-n9 (make-object track% 't-n3-n9 n3 n9 100))
+(define s-n3<n2-n9 (make-object switch% 's-n3<n2-n9 t-n2-n3 t-n3-n9))
+(define tracks (list b-n1-n2 t-n2-n3 t-n3-n4 t-n4-n5 t-n5-n1 t-n5-n6 b-n6-n7 b-n7-n8 s-n5<n1-n6 t-n5-n8 s-n5<n1-n6-n8 t-n3-n9 s-n3<n2-n9))
 
 (define node-tests
   (test-suite
@@ -32,14 +44,18 @@
     (test-case
       "No node should have more than 2 tracks connected to it"
       (for ((node (in-list nodes)))
-        (check >= 2 (length (send node get-tracks)))))
+        (check <= (length (send node get-tracks)) 2)))
     (test-case
-      "Coming from a track, a node can give the next track"
-      (check-eq? b-n2-n3 (send n2 from t-n1-n2))
-      (check-eq? t-n1-n2 (send n2 from b-n2-n3))
-      (check-eq? (send n5 from t-n4-n5) (send n5 from s-n4<n1-n5)
+      "Coming from a track, a node can give the next segment"
+      (check-eq? (send n2 from b-n1-n2)
+                 s-n3<n2-n9)
+      (check-eq? (send n2 from t-n2-n3)
+                 b-n1-n2)
+      (check-eq? (send n6 from s-n5<n1-n6)
+                 (send n6 from t-n5-n6)
                  "Coming from a track or a switch that includes that track returns the same result")
-      (check-eq? (send n5 from s-n4<n1-n5) (send n5 from s-n4<n1-n5-n7)
+      (check-eq? (send n6 from s-n5<n1-n6-n8)
+                 (send n6 from s-n5<n1-n6)
                  "Coming from a switch or a switch that includes that switch returns the same result")
       )))
 
@@ -47,71 +63,106 @@
   (test-suite
     "Tests for track% in tracks.rkt"
     (test-case
-      "When given a connecting node, a track should be able to return the other one"
-      (check-eq? n1 (send t-n1-n2 from n2))
-      (check-eq? n2 (send t-n1-n2 from n1))
-      (check-eq? n2 (send b-n2-n3 from n3))
-      (check-eq? n3 (send b-n2-n3 from n2))
-      (check-eq? n1 (send s-n4<n1-n5 from n4))
-      (check-eq? n4 (send s-n4<n1-n5 from n1)))))
+      "Given a connected track, from should return either a segment on the other side or #f"
+      (check-eq? (send b-n1-n2 from t-n5-n1)
+                 s-n3<n2-n9)
+      (check-eq? (send b-n1-n2 from t-n2-n3)
+                 s-n5<n1-n6-n8 )
+      (check-eq? (send b-n6-n7 from t-n5-n6)
+                 b-n7-n8 )
+      (check-eq? (send t-n5-n1 from b-n7-n8)
+                 #f
+                 "Return #f when tracks don't connect"))
+    (test-case
+      "Given a connected track, from* should return a list of tracks on the other side"
+      (check-eq? (send t-n3-n9 from* t-n3-n4)
+                 '()
+                 "Return the empty list for dead ends")
+      (check-equal? (send b-n1-n2 from* t-n5-n1)
+                    (list t-n2-n3))
+      (check-equal? (list->set (send t-n4-n5 from* t-n3-n4))
+                    (set t-n5-n1 t-n5-n6 t-n5-n8)))))
 
 (define block-tests
   (test-suite
     "Tests for block% in tracks.rkt"
     (test-case
       "Detection blocks can update their status and that of any connected block"
-      (check-eq? 'green (send b-n2-n3 get-status))
-      (send b-n2-n3 set-status 'red)
-      (check-eq? 'red (send b-n2-n3 get-status))
-      (send b-n5-n6 set-status 'red)
-      (check-eq? 'red (send b-n5-n6 get-status))
-      (check-eq? 'orange (send b-n6-n7 get-status)
-                 "Block b-n6-n7 should turn orange when connected block b-n5-n6 turns red")
-      (send b-n5-n6 set-status 'green)
-      (check-eq? 'green (send b-n6-n7 get-status)
-                 "Block b-n6-n7 should turn green when connected block b-n5-n6 turns green"))))
+      (check-eq? (send t-n2-n3 get-status)
+                 'green)
+      (send t-n2-n3 set-status 'red)
+      (check-eq? (send t-n2-n3 get-status)
+                 'red)
+      (send b-n6-n7 set-status 'red)
+      (check-eq? (send b-n6-n7 get-status)
+                 'red)
+      (check-eq? (send b-n7-n8 get-status)
+                 'orange
+                 "Block b-n7-n8 should turn orange when connected block b-n6-n7 turns red")
+      (send b-n6-n7 set-status 'green)
+      (check-eq? (send b-n7-n8 get-status)
+                 'green
+                 "Block b-n7-n8 should turn green when connected block b-n6-n7 turns green"))))
 
 (define switch-tests
   (test-suite
     "Tests for switch% in tracks.rkt"
     (test-case
-      "A switch's from method correctly return connecting node"
-      (check-eq? 'n4 (send (send s-n4<n1-n5 from n1) get-id))
-      (check-eq? 'n1 (send (send s-n4<n1-n5 from n4) get-id))
-      (check-eq? #f (send s-n4<n1-n5 from n5))
-      (send s-n4<n1-n5 change-position)
-      (check-eq? #f (send s-n4<n1-n5 from n1))
-      (check-eq? 'n5 (send (send s-n4<n1-n5 from n4) get-id))
-      (check-eq? 'n4 (send (send s-n4<n1-n5 from n5) get-id)))
+      "A switch's from method returns the next track when entered from the given track"
+      (check-eq? (send s-n5<n1-n6 from b-n1-n2)
+                 t-n4-n5)
+      (check-eq? (send s-n5<n1-n6 from t-n4-n5)
+                 b-n1-n2)
+      (check-eq? (send s-n5<n1-n6 from b-n6-n7)
+                 #f)
+      (send s-n5<n1-n6 change-position)
+      (check-eq? (send s-n5<n1-n6 from t-n4-n5)
+                 b-n6-n7)
+      (check-eq? (send s-n5<n1-n6 from b-n6-n7)
+                 t-n4-n5))
     (test-case
       "A switch that embeds other switches can access those switches"
-      (check = 3 (length (send s-n4<n1-n5-n7 options-from n4))
-             "Switch s-n4<n1-n5-n7 embeds switch s-n4<n1-n5, so it has 3 options from node n4")
-      (check = 1 (length (send s-n4<n1-n5-n7 options-from n7))
-             "Switch s-n4<n1-n5-n7 only has one option when not coming from the shared node")
-      (send s-n4<n1-n5-n7 set-current-track t-n4-n1)
-      (check-eq? 'n1 (send (send s-n4<n1-n5-n7 from n4) get-id))
-      (send s-n4<n1-n5-n7 set-current-track t-n4-n5)
-      (check-eq? 'n5 (send (send s-n4<n1-n5-n7 from n4) get-id))
-      (send s-n4<n1-n5-n7 set-current-track t-n4-n7)
-      (check-eq? 'n7 (send (send s-n4<n1-n5-n7 from n4) get-id))
-      (send s-n4<n1-n5-n7 set-current-track s-n4<n1-n5)
-      (check-eq? (send s-n4<n1-n5 from n4) (send s-n4<n1-n5-n7 from n4)
+      (check-equal? (list->set (send s-n5<n1-n6 get-positions))
+                    (set t-n5-n1 t-n5-n6)
+                    "Switch s-n5<n1-n6 has 2 positions")
+      (check-equal? (list->set (send s-n5<n1-n6-n8 get-positions))
+                    (set t-n5-n1 t-n5-n6 t-n5-n8)
+                    "Switch s-n5<n1-n6-n8 embeds switch s-n5<n1-n6, so it has 3 positions")
+      (send s-n5<n1-n6-n8 set-position 2)
+      (check-eq? (send s-n5<n1-n6-n8 get-position)
+                 2
+                 "Switch s-n5<n1-n6-n8 should be in position 2")
+      (send s-n5<n1-n6 change-position)
+      (check-eq? (send s-n5<n1-n6-n8 get-position)
+                 1
+                 "Changing the position of s-n5<n1-n6 should also change the position of s-n5<n1-n6-7")
+      (check-eq? (send s-n5<n1-n6 from t-n4-n5) (send s-n5<n1-n6-n8 from t-n4-n5)
                  "When switched to embedded switch, both will return same value on 'from' call")
-      (check-exn exn:fail? (lambda () (send s-n4<n1-n5-n7 set-current-track t-n1-n2))
+      (check-exn exn:fail? (lambda () (send s-n5<n1-n6-n8 set-current-track b-n1-n2))
                  "Cannot be switched to non-connecting track"))
     (test-case
       "A switch embedded by another switch can change the position of that switch when needed"
-      (send s-n4<n1-n5-n7 set-position 2)
-      (check = 2 (send s-n4<n1-n5-n7 get-position))
-      (send s-n4<n1-n5 set-position 1)
-      (check = 1 (send s-n4<n1-n5 get-position))
-      (check = 1 (send s-n4<n1-n5-n7 get-position)))
+      (send s-n5<n1-n6-n8 set-position 2)
+      (check = 2 (send s-n5<n1-n6-n8 get-position))
+      (send s-n5<n1-n6 set-position 1)
+      (check = 1 (send s-n5<n1-n6 get-position))
+      (check = 1 (send s-n5<n1-n6-n8 get-position)))
     (test-case
-      "Given a track, a switch can return its connected tracks"
-      (check-eq? null (send s-n4<n1-n5 options-from-track b-n2-n3))
-      (check-eq? t-n4-n1 (car (send s-n4<n1-n5 options-from-track t-n1-n2)))
-      (check = 3 (length (send s-n4<n1-n5-n7 options-from-track t-n3-n4))))))
+      "Given a track, from* returns any other tracks accessible from it"
+      (check-eq? (send s-n5<n1-n6 from* t-n2-n3)
+                 null)
+      (check-eq? (car (send s-n5<n1-n6 from* b-n1-n2))
+                 t-n4-n5)
+      (check-equal? (list->set (send s-n5<n1-n6-n8 from* t-n4-n5))
+                    (set b-n1-n2 b-n6-n7 b-n7-n8)))
+    (test-case
+      "Tracks can tell whether they're part of the same segment"
+      (check-eq? #t (send s-n5<n1-n6-n8 same-segment? s-n5<n1-n6))
+      (check-eq? #t (send s-n5<n1-n6-n8 same-segment? t-n5-n8))
+      (check-eq? #t (send t-n5-n1 same-segment? s-n5<n1-n6-n8))
+      (check-eq? #t (send t-n5-n1 same-segment? s-n5<n1-n6))
+      (check-eq? #f (send b-n1-n2 same-segment? s-n5<n1-n6))
+      (check-eq? #f (send b-n1-n2 same-segment? t-n2-n3)))))
 
 
 

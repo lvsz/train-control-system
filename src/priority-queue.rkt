@@ -13,7 +13,7 @@
          data/gvector)
 
 (define modifiable-heap%
-  (class object%
+  (class* object% (writable<%>)
     (init-field <<?)
     (field (storage (make-gvector)))
     (super-new)
@@ -102,7 +102,13 @@
               ((<<? (get parent) (get idx))
                (sift-down idx))
               (else
-               (sift-up idx)))))))
+               (sift-up idx)))))
+
+    (define/public (custom-write port)
+      (write "#modifiable-heap" port)
+      (write (gvector->list storage) port))
+    (define/public (custom-display port)
+      (custom-write port))))
 
 (struct item (value (priority #:mutable)) #:transparent)
 

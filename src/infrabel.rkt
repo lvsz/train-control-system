@@ -23,7 +23,10 @@
     (define/public (stop)
       (sim:stop))
 
+    (define locos '())
+
     (define/public (add-loco id prev-segment curr-segment)
+      (set! locos (cons id locos))
       (sim:add-loco id prev-segment curr-segment))
     (define/public (remove-loco id)
       (sim:remove-loco id))
@@ -31,16 +34,21 @@
       (sim:get-loco-speed id))
     (define/public (set-loco-speed id speed)
       (sim:set-loco-speed! id speed))
+    (define/public (change-loco-direction id)
+      (sim:set-loco-speed! id (- (sim:get-loco-speed id))))
     (define/public (get-loco-detection-block id)
       (sim:get-loco-detection-block id))
 
     (define/public (get-switch-position id)
-      (displayln (list 'get-switch-position id))
       (sim:get-switch-position id))
     (define/public (set-switch-position id position)
-      (displayln (list 'set-switch-position id position))
       (sim:set-switch-position! id position))
 
     (define/public (get-detection-block-ids)
       (sim:get-detection-block-ids))))
+
+    ;(thread (lambda ()
+    ;          (let loop ()
+    ;            (for-each (lambda (loco)
+    ;                        (let
 

@@ -112,7 +112,8 @@
             (else
              ; case for additional loco added
              (set! locos (append locos (list new-loco)))
-             (send loco-select-menu append (symbol->string new-loco)))))))
+             (send loco-select-menu append (symbol->string new-loco))
+             (send loco-select-menu set-selection (sub1 (length locos))))))))
 
 
 ;; main panel for the user to control locomotives
@@ -145,9 +146,8 @@
                        (set! loco-list (send nmbs get-loco-ids))
                        ; get selection menu to include new loco
                        (send loco-select-menu add-loco loco-id)
-                       ; if first loco, set to active loco
-                       (unless active-loco
-                         (set! active-loco loco-id))))))
+                       ; set new loco to active loco
+                       (set! active-loco loco-id)))))
 
     ; initialize selection menu
     (define loco-select-menu
@@ -176,7 +176,26 @@
              (lambda (slider evt)
                (when active-loco
                  (send nmbs set-loco-speed active-loco
-                       (send slider get-value)))))))))
+                       (send slider get-value)))))))
+
+    (define detection-blocks
+      (sort (send nmbs get-detection-block-ids) id<?))
+
+    (define router
+      (new choice%
+           (label "Router")
+           (choices (map symbol->string detection-blocks))
+           (parent this)
+           (vert-margin 200)
+           (callback
+             (lambda (choice evt)
+               (thread (lambda ()
+                         (let ((idx (send choice get-selection)))
+                           (when (and idx active-loco)
+                             (send nmbs
+                                   route
+                                   active-loco
+                                   (list-ref detection-blocks idx))))))))))))
 
 
 ;; main panel to control the railway's switches

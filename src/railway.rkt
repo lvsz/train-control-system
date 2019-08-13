@@ -35,11 +35,11 @@
     (define/public (get-switch-ids)
       (hash-keys switches))
 
-    (define/public (get-block id)
+    (define/public (get-detection-block id)
       (hash-ref blocks id))
-    (define/public (get-blocks)
+    (define/public (get-detection-blocks)
       (hash-values blocks))
-    (define/public (get-block-ids)
+    (define/public (get-detection-block-ids)
       (hash-keys blocks))
 
     (define/public (get-loco id)
