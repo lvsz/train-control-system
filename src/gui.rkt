@@ -60,7 +60,6 @@
                          (symbol->string (send starting-spot get-id)))
                        starting-spots))
          (parent this)
-         (vert-margin 20)
          (callback
            (lambda (choice evt)
              (let ((idx (send choice get-selection)))
@@ -77,7 +76,7 @@
     (init-field locos callback)
     (super-new (enabled (not (null? locos)))
                (min-height 50)
-               (vert-margin 50)
+               (vert-margin 10)
                (alignment '(center top)))
 
     ; function to fully initialize this panel
@@ -122,6 +121,8 @@
     (init-field nmbs)
     (super-new (enabled #t)
                (style '(border))
+               (min-height 300)
+               (stretchable-height #f)
                (alignment '(center top)))
 
     ; list that keeps all loco ids
@@ -168,10 +169,15 @@
                        (send speed-slider set-value
                              (hash-ref loco-speeds loco-id))))))
 
+    (define loco-control
+      (new vertical-pane%
+           (parent this)
+           ))
+
     (define speed-control
       (new horizontal-pane%
-           (parent this)
-           (vert-margin 100)))
+           (parent loco-control)
+           ))
 
     ; initialize slider to control the active loco's speed
     (define speed-slider
@@ -214,8 +220,8 @@
       (new choice%
            (label "Router")
            (choices (map symbol->string detection-blocks))
-           (parent this)
-           (vert-margin 200)
+           (parent loco-control)
+           (vert-margin 0)
            (callback
              (lambda (choice evt)
                (thread (lambda ()
@@ -224,7 +230,8 @@
                              (send nmbs
                                    route
                                    active-loco
-                                   (list-ref detection-blocks idx))))))))))))
+                                   (list-ref detection-blocks idx))))))))))
+    ))
 
 
 ;; main panel to control the railway's switches
@@ -232,19 +239,82 @@
   (class vertical-panel%
     (init-field nmbs)
     (super-new (enabled #t)
+               (style '(border))
                (alignment '(center top)))
-    (define buttons
-        (map (lambda (id)
-               (new button%
-                    (label (symbol->string id))
-                    (parent this)
-                    (enabled #t)
-                    (vert-margin 0)
-                    (horiz-margin 0)
-                    (callback
-                      (lambda (button evt)
-                        (send nmbs change-switch-position id)))))
-             (sort (send nmbs get-switch-ids) id<?)))))
+    (define buttons (make-hash))
+    (define (mk-label id (pos (send nmbs get-switch-position id)))
+      (format "~a: ~a" id pos))
+    (define (switch-changed id position)
+      (send (hash-ref buttons id) set-label (mk-label id position)))
+    (send nmbs add-switch-listener switch-changed)
+    (for-each (lambda (id)
+                (hash-set! buttons id
+                           (new button%
+                                (label (mk-label id))
+                                (parent this)
+                                (enabled #t)
+                                (vert-margin 0)
+                                (horiz-margin 0)
+                                (callback
+                                  (lambda (button evt)
+                                    (send nmbs change-switch-position id))))))
+                (sort (send nmbs get-switch-ids) id<?))))
+
+(define db-light%
+  (class object%
+    (init-field name bmp-dc)
+    (field (status 'green))
+    (super-new)
+    (define bmp (make-bitmap 120 20))
+    (define char-h (send bmp-dc get-char-height))
+    (define/public (get-bmp)
+      bmp)
+    (define/public (set-status new-status)
+      (set! status new-status)
+      (send bmp-dc set-bitmap bmp)
+      (send bmp-dc set-background
+            (case status
+              ((red) (make-color 255 0 0))
+              ((green) (make-color 0 255 0))
+              ((orange) (make-color 255 200 0))))
+      (send bmp-dc clear)
+      (send bmp-dc draw-text name 8 1))))
+
+
+(define detection-block-panel%
+  (class group-box-panel%
+    (init-field nmbs)
+    (super-new (label "Detection blocks")
+               (enabled #t)
+               (min-width 120)
+               (stretchable-width #f)
+               (alignment '(center top)))
+    (define detection-blocks
+      (for/list ((db (in-list (sort (send nmbs get-detection-block-ids) id<?))))
+        (make-object db-light% (symbol->string db) (new bitmap-dc%))))
+    (define dbs
+      (for/hash ((db (in-list (sort (send nmbs get-detection-block-ids) id<?)))
+                 (l (in-list detection-blocks)))
+        (values db l)))
+    (define canvas
+      (new canvas% (parent this)
+           (paint-callback (lambda (canvas dc)
+                             (for ((light (in-list detection-blocks))
+                                   (i (in-range 3 1000 23)))
+                               (send dc draw-bitmap (send light get-bmp) 0 i))))))
+    (define (change-db id status)
+      (send (hash-ref dbs id) set-status status)
+      (send canvas refresh))
+    (send nmbs add-detection-block-listener change-db)
+
+    (define bmp (make-bitmap 1080 120))
+    ;(define dc )
+    ;(for* ((i 30) (j 30))
+      ;(send dc set-pixel i j (make-color 0 255 0)))
+    ;(send dc set-background (make-color 0 255 0))
+    ;(send dc clear)
+    ;(send dc draw-text "hello" 5 5)
+    ))
 
 (define setup-window%
   (class frame%
@@ -270,8 +340,7 @@
 
 (define window%
   (class frame%
-    (init-field nmbs (atexit void))
-    (init (width 400) (height 400))
+    (init-field nmbs (atexit void) (width 400) (height 400))
     (super-new (label "NMBS")
                (width width)
                (height (+ height 22)))
@@ -298,8 +367,9 @@
     ;       (choices '("a" "b" "c"))))
 
     (define bottom-pane
-      (new horizontal-pane%
-           (parent parent-panel)))
+      (new horizontal-panel%
+           (parent parent-panel)
+           (alignment '(center top))))
 
     (define loco-panel
       (new loco-panel%
@@ -308,6 +378,11 @@
 
     (define switch-panel
       (new switch-panel%
+           (nmbs nmbs)
+           (parent bottom-pane)))
+
+    (define detection-block-panel
+      (new detection-block-panel%
            (nmbs nmbs)
            (parent bottom-pane)))
 

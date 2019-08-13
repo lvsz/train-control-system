@@ -32,16 +32,38 @@
     (define railway #f)
     (define starting-spots '())
 
+    (define switch-listeners '())
+    (define (get-switch-listeners)
+      switch-listeners)
+    (define/public (add-switch-listener fn)
+      (set! switch-listeners (cons fn switch-listeners)))
+
+    (define detection-block-listeners '())
+    (define/public (add-detection-block-listener fn)
+      (set! detection-block-listeners
+            (cons fn detection-block-listeners)))
+
+    (define (get-updates)
+      (for ((db (in-list (send infrabel get-detection-block-statuses))))
+        (for ((fn (in-list detection-block-listeners)))
+          (fn (car db) (cdr db))))
+      (sleep 1)
+      (get-updates))
+
+    (thread get-updates)
+
     (define/public (initialize setup)
       (set! railway (make-object railway% setup))
       (for-each (lambda (switch)
                   (send switch
                         set-callback
                         (lambda ()
-                          (send infrabel
-                                set-switch-position
-                                (send switch get-id)
-                                (send switch get-position)))))
+                          (let ((id (send switch get-id))
+                                (pos (send switch get-position)))
+                            (for-each (lambda (fn)
+                                        (fn id pos))
+                                      (get-switch-listeners))
+                            (send infrabel set-switch-position id pos)))))
                 (send railway get-switches))
       (send infrabel initialize (send setup get-id))
       (send infrabel start)
@@ -57,8 +79,7 @@
       (send railway get-detection-block-ids))
 
     (define/public (get-switch-position id)
-      (cons (send infrabel get-switch-position id)
-            (send (send railway get-switch id) get-position)))
+      (send (send railway get-switch id) get-position))
     (define/public (set-switch-position id int)
       (send (send railway get-switch id) set-position int))
     (define/public (change-switch-position id)
@@ -291,6 +312,9 @@
       (if (null? route)
         '()
         (car route)))
+
+    ;(define/public (part-of? track)
+      ;(memq 
 
     (define (set-switches)
       (let loop ((next (cdr route))
