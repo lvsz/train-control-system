@@ -165,17 +165,22 @@
                        ; set active loco to selected loco
                        (set! active-loco loco-id)
                        ; update speed controller to show selected loco's speed
-                       (send speed-control set-value
+                       (send speed-slider set-value
                              (hash-ref loco-speeds loco-id))))))
 
-    ; initialize slider to control the active loco's speed
     (define speed-control
+      (new horizontal-pane%
+           (parent this)
+           (vert-margin 100)))
+
+    ; initialize slider to control the active loco's speed
+    (define speed-slider
       (new slider%
            (label "Speed")
+           (parent speed-control)
            (min-value 0)
            (max-value max-speed)
-           (parent this)
-           (vert-margin 100)
+           (min-width 150)
            (style '(horizontal vertical-label))
            (init-value 0)
            (enabled #t)
@@ -188,9 +193,19 @@
     (define (loco-speed-changed id speed)
       (hash-set! loco-speeds id speed)
       (when (eq? id active-loco)
-        (send speed-control set-value speed)))
+        (send speed-slider set-value speed)))
 
     (send nmbs add-loco-speed-listener loco-speed-changed)
+
+    (define reverse-button
+      (new button%
+           (label "Reverse")
+           (parent speed-control)
+           (enabled #t)
+           (callback
+             (lambda (btn evt)
+               (when active-loco
+                 (send nmbs change-loco-direction active-loco))))))
 
     (define detection-blocks
       (sort (send nmbs get-detection-block-ids) id<?))
