@@ -125,23 +125,37 @@
         (change-loco-direction loco-id))
       (define speed 100)
       (define interval 0.1)
-      (define clearance (/ 100 (abs speed)))
+      (define clearance (/ 100 speed))
       (set-loco-speed loco-id speed)
       (define (loco-speed-changed id new-speed)
         (when (eq? id loco-id)
-          (set! speed new-speed)))
+          (set! speed new-speed)
+          (unless (zero? speed)
+            (set! clearance (/ 100 speed)))))
       (add-loco-speed-listener loco-speed-changed)
+      (define last-update (current-milliseconds))
+
       (define (reverse-loco)
         (sleep clearance)
         (send loco update-location (send route next))
         (change-loco-direction loco-id)
-        (route-iter (- (send (send route current) get-length)
-                       (* clearance speed))))
+        (sleep clearance)
+        (set! last-update (current-milliseconds))
+        (route-iter (send (send route current) get-length)))
+
       (define (route-iter travelled)
         (sleep interval)
+        (define delta (let ((old-update last-update))
+                        (set! last-update (current-milliseconds))
+                        (/ (- last-update old-update) 1000.0)))
         (let ((curr (send loco get-current-track))
               ;(prev (send loco get-previous-track))
               (db? (get-loco-detection-block loco-id)))
+          ;(displayln (cons 'curr curr))
+          ;(displayln (cons 'expected (send route current)))
+          ;(displayln (cons 'next (send route peek-next)))
+          ;(displayln (cons 'travelled travelled))
+          ;(newline)
           (if db?
             ; if loco is on db
             (let ((db (get-track db?)))
@@ -152,15 +166,17 @@
                  (send loco update-location db))
                 ; loco on same db as before
                 ((eq? db curr)
-                 (route-iter (+ travelled (* interval speed))))
+                 (route-iter (+ travelled (* delta speed))))
                 ; loco on differne db
                 ((send route reverse?)
                  (reverse-loco))
                 ((eq? db (send route peek-next))
                  ;(error "took a wrong turn"))
-                 (send loco update-location db)
+                 (send loco update-location (send route next))
                  (route-iter 0))
-                (else (route-iter (+ travelled (* interval speed))))))
+                (else
+                  (displayln (format "shouldn't be on ~a" db))
+                 (route-iter (+ travelled (* delta speed))))))
             (cond ((is-a? curr block%)
                    ; last iteration, loco was on a db, but no longer
                    (send loco update-location (send route next))
@@ -172,51 +188,10 @@
                      (begin (send loco update-location (send route next))
                             (route-iter 0))))
                   (else
-                   (route-iter (+ travelled (* interval speed))))))))
+                   (route-iter (+ travelled (* delta speed))))))))
       (define (start)
         (route-iter 0))
       (thread start))
-
-;
-;                 ; loco is on db so time & travelled don't matter
-;                (else
-;                 (sleep interval)
-;
-;        (let ((curr )
-;              (prev (send loco get-previous-track))
-;              (db (let ((db? (send infrabel get-loco-detection-block loco-id)))
-;                    (if db?
-;                      (get-track db?)
-;                      #f)))
-;              (speed 100)
-;              (pos-in-curr 0))
-;          (when (eq? (cadr route) 
-;
-;          (when d
-;            (set! db (get-track db))
-;            (send loco update-location db curr))
-;          (cond ((send curr same-segment? end)
-;                 (set-loco-speed loco-id 0))
-;                ((send 
-
-
-
-      ;(define start-track (send railway get-track start))
-      ;(define end-track (send railway get-track end))
-      ;(define-values ((start-node-1 start-node-2) (send start-track get-nodes)))
-      ;(define-values ((end-node-1 end-node-2) (send end-track get-nodes)))
-      ;(define nodes (send railway get-nodes))
-      ;(define distances (make-hash (map (lambda (n) (cons n +inf.0)) nodes)))
-      ;(define prevs (make-hash (map (lambda (n) (cons n #f)) nodes)))
-
-      ;(define (for-each-track from fn)
-      ;  (let ((tracks (send from get-tracks)))
-      ;    ()))
-
-      ;(hash-set! distances start-node-1 0)
-      ;(hash-set! distances start-node-2 0)
-
-      ;void)
 
     ;; get list of spots where a new loco can be added
     ;; to be a valid spot, 2 connected detection blocks are needed whose
@@ -313,9 +288,6 @@
         '()
         (car route)))
 
-    ;(define/public (part-of? track)
-      ;(memq 
-
     (define (set-switches)
       (let loop ((next (cdr route))
                  (visited (list (get-field segment (car route)))))
@@ -333,5 +305,6 @@
                 (segment-2 (get-field segment (caddr route))))
             (eq? segment-1 segment-2))))
 
-        (set-switches)))
+      ;(displayln route)
+      (set-switches)))
 

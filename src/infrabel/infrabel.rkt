@@ -1,10 +1,10 @@
 #lang racket/base
 
 (require racket/class
-         "railway.rkt"
-         "adts.rkt"
-         "setup.rkt"
-         (prefix-in sim: "gui_simulator/interface.rkt"))
+         "../railway.rkt"
+         "../adts.rkt"
+         "../setup.rkt"
+         (prefix-in sim: "../gui_simulator/interface.rkt"))
 
 (provide infrabel%)
 
@@ -83,7 +83,6 @@
 
     (define/public (get-detection-block-ids)
       (sim:get-detection-block-ids))
-
     (define/public (get-detection-block-statuses)
       (for/list ((db (in-list (hash-values detection-blocks))))
         (cons (send db get-id) (send db get-status))))))

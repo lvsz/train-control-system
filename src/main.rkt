@@ -2,7 +2,7 @@
 
 (require racket/class
          "nmbs/nmbs.rkt"
-         "infrabel.rkt"
+         "infrabel/interface.rkt"
          "gui.rkt"
          "setup.rkt")
 
@@ -27,9 +27,8 @@
   ;; create window & run application
   (void (cond (setup-id
                 (send nmbs initialize (get-setup setup-id))
-                (thread (lambda ()
                 (new window% (nmbs nmbs)
-                     (atexit (lambda () (send infrabel stop)))))))
+                     (atexit (lambda () (send infrabel stop)))))
               (else
                 (new setup-window%
                      (nmbs nmbs)
