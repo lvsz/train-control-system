@@ -32,22 +32,22 @@
 ; paren indicates regular switch (2 exits)
 ; bracket indicates double switch (3 exits)
 
-(define b-n1-n2 (make-object block% 'b-n1-n2 n1 n2 500))
-(define t-n2-n3 (make-object block% 't-n2-n3 n2 n3 200))
+(define b-n1-n2 (make-object detection-block% 'b-n1-n2 n1 n2 500))
+(define t-n2-n3 (make-object detection-block% 't-n2-n3 n2 n3 200))
 (define t-n3-n4 (make-object track% 't-n3-n4 n3 n4 100))
 (define t-n4-n5 (make-object track% 't-n4-n5 n4 n5 100))
 (define t-n5-n1 (make-object track% 't-n5-n1 n1 n5 200)) ; order of given nodes shouldn't matter
 (define t-n5-n6 (make-object track% 't-n5-n6 n5 n6 50))
-(define b-n6-n7 (make-object block% 'b-n6-n7 n6 n7 50))
-(define b-n7-n8 (make-object block% 'b-n7-n8 n7 n8 50))
+(define b-n6-n7 (make-object detection-block% 'b-n6-n7 n6 n7 50))
+(define b-n7-n8 (make-object detection-block% 'b-n7-n8 n7 n8 50))
 (define s-n5<n1-n6 (make-object switch% 's-n5<n1-n6 t-n5-n1 t-n5-n6))
 (define t-n5-n8 (make-object track% 't-n5-n8 n5 n8 50))
 (define s-n5<n1-n6-n8 (make-object switch% 's-n5<n1-n6-n8 s-n5<n1-n6 t-n5-n8))
 (define t-n3-n9 (make-object track% 't-n3-n9 n3 n9 100))
 (define s-n3<n2-n9 (make-object switch% 's-n3<n2-n9 t-n2-n3 t-n3-n9))
-(define b-n9-n10 (make-object block% 'b-n9-n10 n9 n10 50))
-(define b-n10-n11 (make-object block% 'b-n10-n11 n10 n11 50))
-(define b-n11-n12 (make-object block% 'b-n11-n12 n11 n12 50))
+(define b-n9-n10 (make-object detection-block% 'b-n9-n10 n9 n10 50))
+(define b-n10-n11 (make-object detection-block% 'b-n10-n11 n10 n11 50))
+(define b-n11-n12 (make-object detection-block% 'b-n11-n12 n11 n12 50))
 (define tracks (list b-n1-n2 t-n2-n3 t-n3-n4 t-n4-n5 t-n5-n1 t-n5-n6 b-n6-n7 b-n7-n8 s-n5<n1-n6 t-n5-n8 s-n5<n1-n6-n8 t-n3-n9 s-n3<n2-n9))
 
 (define node-tests
@@ -97,7 +97,7 @@
 
 (define block-tests
   (test-suite
-    "Tests for block% in tracks.rkt"
+    "Tests for detection-block% in tracks.rkt"
     (test-case
       "Detection blocks can update their status and that of any connected block"
       (check-eq? (send t-n2-n3 get-status)

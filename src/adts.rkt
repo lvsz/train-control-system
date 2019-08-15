@@ -5,7 +5,13 @@
          racket/function
          racket/set)
 
-(provide node% track% block% switch% loco%)
+(provide node%
+         track%
+         detection-block%
+         switch%
+         loco%
+         switch?
+         detection-block?)
 
 (define (connected? track-1 track-2)
   (let ((node-1-1 (get-field node-1 track-1))
@@ -16,6 +22,12 @@
         (eq? node-1-1 node-2-2)
         (eq? node-1-2 node-2-1)
         (eq? node-1-2 node-2-2))))
+
+(define (switch? segment)
+  (is-a? segment switch%))
+
+(define (detection-block? segment)
+  (is-a? segment detection-block%))
 
 (define (nub lst)
   (set->list (list->set lst)))
@@ -82,20 +94,22 @@
           (car (remq segment connected)))))
 
     (define/public (from* track)
-      (let ((to (from track))
-            (back (if (is-a? (get-field segment track) switch%)
-                    (filter (lambda (p) (connected? this p))
-                            (remq track (send (get-field segment track)
-                                              get-positions)))
-                    '())))
-        (cond ((not to)
-               back)
-              ((is-a? to switch%)
+      (let (; options going forwards
+            (fwd (from track))
+            ; options when reversing on this track
+            (rev (if (is-a? (get-field segment track) switch%)
+                   (filter (lambda (p) (connected? this p))
+                           (remq track (send (get-field segment track)
+                                             get-positions)))
+                   '())))
+        (cond ((not fwd)
+               rev)
+              ((is-a? fwd switch%)
                (append (filter (lambda (p) (connected? this p))
-                              (send to get-positions))
-                      back))
+                              (send fwd get-positions))
+                      rev))
               (else
-               (cons to back)))))
+               (cons fwd rev)))))
 
     (define/public (get-connected-tracks)
       (filter identity
@@ -130,7 +144,7 @@
     (define/public (custom-display port)
       (display (send segment get-id) port))))
 
-(define block%
+(define detection-block%
   (class track%
     (init ((_id id))
           ((_node-1 node-1))
@@ -143,7 +157,7 @@
     (define connected-blocks
       (for/list ((track (in-list (list (send node-1 from this)
                                        (send node-2 from this))))
-                 #:when (is-a? track block%))
+                 #:when (is-a? track detection-block%))
         (send track connect-block this)
         track))
 
@@ -172,7 +186,7 @@
       (set! status new-status))
 
     (define/override (custom-write port)
-      (write (cons 'block% id) port))))
+      (write (cons 'detection-block% id) port))))
 
 
 (define switch%
@@ -301,9 +315,9 @@
       (set! previous-track new-previous-track))
 
     ;(define/public (set-location new-location)
-      ;(when (is-a? location block%)
+      ;(when (is-a? location detection-block%)
         ;(send location set-status 'green))
-      ;(when (is-a? new-location block%)
+      ;(when (is-a? new-location detection-block%)
         ;(send new-location set-status 'red))
       ;(set! location new-location))
     (define/public (get-speed)

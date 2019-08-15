@@ -71,7 +71,7 @@
         (hash-set! switches id switch)))
 
     (define (add-block id n1 n2 length)
-      (let ((block (make-object block% id n1 n2 length)))
+      (let ((block (make-object detection-block% id n1 n2 length)))
         (hash-set! tracks id block)
         (hash-set! blocks id block)))
 
