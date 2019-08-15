@@ -108,11 +108,12 @@
           #f
           (car (remq segment connected)))))
 
-    (define/public (from* track)
+    (define/public (from* track (include-rev #t))
       (let (; options going forwards
             (fwd (from track))
             ; options when reversing on this track
-            (rev (if (is-a? (send track get-segment) switch%)
+            (rev (if (and include-rev
+                          (switch? (send track get-segment)))
                    (filter (lambda (p) (connected? this p))
                            (remq track (send (send track get-segment)
                                              get-positions)))
@@ -235,9 +236,9 @@
     (define/override (from track)
       (send (current) from track))
 
-    (define/override (from* track)
-      (flatten (list (send position-1 from* track)
-                     (send position-2 from* track))))
+    (define/override (from* track (include-rev #t))
+      (flatten (list (send position-1 from* track include-rev)
+                     (send position-2 from* track include-rev))))
 
     (define/override (get-length)
       (send (current) get-length))
@@ -250,10 +251,10 @@
                    (send position-2 get-connected-tracks))))
 
     (define/public (get-positions (from #f))
-      (flatten (list (if (is-a? position-1 switch%)
+      (flatten (list (if (switch? position-1)
                        (send position-1 get-positions)
                        position-1)
-                     (if (is-a? position-2 switch%)
+                     (if (switch? position-2)
                        (send position-2 get-positions)
                        position-2))))
 
