@@ -45,54 +45,6 @@
                                    (list-ref setups idx))
                              (callback)))))))))))
 
-
-
-;; subpanel used to select a locomotive
-;; doesn't show when there are no locomotives
-(define loco-select-panel%
-  (class panel%
-    (init-field locos callback)
-    (super-new (enabled (not (null? locos)))
-               (min-height 50)
-               (vert-margin 10)
-               (alignment '(center top)))
-
-    ; function to fully initialize this panel
-    (define (enable-loco-select-menu!)
-      (set! loco-select-menu (make-loco-select-menu))
-      (send this enable #t))
-
-    ; no loco-select-menu when there are no locos
-    (define loco-select-menu #f)
-    ; if there are loco, enable loco-select-menu
-    (unless (null? locos)
-      (enable-loco-select-menu!))
-
-    (define (make-loco-select-menu)
-      (new choice%
-           (label "Active loco")
-           (choices (map symbol->string locos))
-           (parent this)
-           (vert-margin 20)
-           (callback
-             (lambda (choice evt)
-               (thread (lambda ()
-               (let ((idx (send choice get-selection)))
-                 (when idx
-                   (callback (list-ref locos idx))))))))))
-
-    (define/public (add-loco new-loco)
-      (cond ((null? locos)
-             ; case for first loco added
-             (set! locos (list new-loco))
-             (enable-loco-select-menu!))
-            (else
-             ; case for additional loco added
-             (set! locos (append locos (list new-loco)))
-             (send loco-select-menu append (symbol->string new-loco))
-             (send loco-select-menu set-selection (sub1 (length locos))))))))
-
-
 ;; main panel for the user to control locomotives
 (define loco-panel%
   (class panel%
@@ -101,70 +53,82 @@
                (style '(border))
                (min-height 300)
                (stretchable-height #f)
-               (alignment '(center top)))
+               (alignment '(right top)))
 
     ; list that keeps all loco ids
-    (define loco-list '())
-    (define loco-speeds (make-hash))
+    (define locos '())
 
     ; no active loco when there are no locos
     ; otherwise default to first one in list
     (define active-loco
-      (if (null?  loco-list)
+      (if (null?  locos)
         #f
-        (car loco-list)))
+        (car locos)))
 
     (define starting-spots
       (sort (send nmbs get-starting-spots) id<?))
+
+    (define (mk-listener id)
+      (lambda (speed)
+        (when (eq? id active-loco)
+          (send speed-slider set-value speed))))
 
     ;; subpanel used to add new locomotives
     ;; uses a list of tracks that have the same id in both nmbs & simulator
     (define add-loco-menu
       (new choice%
-         (label "Add new locomotive to track")
-         (choices (map (lambda (starting-spot)
-                         (symbol->string starting-spot))
-                       starting-spots))
-         (parent this)
-         (callback
-           (lambda (choice evt)
-             (let ((idx (send choice get-selection)))
-               (when idx
-                 (let ((id (send nmbs add-loco (list-ref starting-spots idx))))
-                   ; new loco is added, get updated list first
-                   (set! loco-list (send nmbs get-loco-ids))
-                   ; update loco speeds
-                   (for-each (lambda (loco)
-                               (hash-set! loco-speeds
-                                          loco
-                                          (send nmbs get-loco-speed loco)))
-                             loco-list)
-                   ; get selection menu to include new loco
-                   (send loco-select-menu add-loco id)
-                   ; set new loco to active loco
-                   (set! active-loco id))))))))
+           (label "Add new locomotive to track")
+           (choices (cons "---" (map (lambda (starting-spot)
+                                       (symbol->string starting-spot))
+                                     starting-spots)))
+           (parent this)
+           (min-width 155)
+           (callback
+             (lambda (choice evt)
+               (let ((idx (sub1 (send choice get-selection))))
+                 (when (>= idx 0)
+                   (let ((id (send nmbs add-loco (list-ref starting-spots idx))))
+                     ; updates loco list & selection menu
+                     (add-loco-to-menu! id)
+                     ; add listener for speed updates
+                     (send nmbs add-loco-speed-listener id (mk-listener id))
+                     ; set new loco to active loco
+                     (set! active-loco id)
+                     (send choice set-selection 0))))))))
 
     ; initialize selection menu
     (define loco-select-menu
-      (new loco-select-panel%
+      (new choice%
+           (label "Active loco")
+           (choices (if (null? locos)
+                      (list "---")
+                      (map symbol->string locos)))
            (parent this)
-           (locos loco-list)
-           (callback (lambda (loco-id)
-                       ; set active loco to selected loco
-                       (set! active-loco loco-id)
-                       ; update speed controller to show selected loco's speed
-                       (send speed-slider set-value
-                             (hash-ref loco-speeds loco-id))))))
+           (vert-margin 40)
+           (min-width 155)
+           (callback
+             (lambda (choice evt)
+               (let ((idx (send choice get-selection)))
+                 (unless (null? locos)
+                   (let ((loco (list-ref locos idx)))
+                     (set! active-loco loco)
+                     (send speed-slider set-value
+                           (send nmbs get-loco-speed loco)))))))))
+
+    (define (add-loco-to-menu! id)
+      (when (null? locos)
+        (send loco-select-menu delete 0))
+      (set! locos (append locos (list id)))
+      (send loco-select-menu append (symbol->string id))
+      (send loco-select-menu set-selection (sub1 (length locos))))
 
     (define loco-control
       (new vertical-pane%
-           (parent this)
-           ))
+           (parent this)))
 
     (define speed-control
       (new horizontal-pane%
-           (parent loco-control)
-           ))
+           (parent loco-control)))
 
     ; initialize slider to control the active loco's speed
     (define speed-slider
@@ -182,13 +146,6 @@
                (when active-loco
                  (send nmbs set-loco-speed active-loco
                        (send slider get-value)))))))
-
-    (define (loco-speed-changed id speed)
-      (hash-set! loco-speeds id speed)
-      (when (eq? id active-loco)
-        (send speed-slider set-value speed)))
-
-    (send nmbs add-loco-speed-listener loco-speed-changed)
 
     (define reverse-button
       (new button%
@@ -217,8 +174,7 @@
                              (send nmbs
                                    route
                                    active-loco
-                                   (list-ref detection-blocks idx))))))))))
-    ))
+                                   (list-ref detection-blocks idx))))))))))))
 
 
 ;; main panel to control the railway's switches
