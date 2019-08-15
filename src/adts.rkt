@@ -12,7 +12,8 @@
          loco%
          track?
          switch?
-         detection-block?)
+         detection-block?
+         same-segment?)
 
 (define (connected? track-1 track-2)
   (let ((node-1-1 (get-field node-1 track-1))
@@ -32,6 +33,10 @@
 
 (define (detection-block? segment)
   (is-a? segment detection-block%))
+
+(define (same-segment? a b)
+  (eq? (send a get-segment)
+       (send b get-segment)))
 
 (define (nub lst)
   (set->list (list->set lst)))
@@ -90,6 +95,9 @@
 
     (define/public (get-nodes)
       (values node-1 node-2))
+
+    (define/public (get-current-track)
+      this)
 
     (define/public (from track)
       (let ((segment (send track get-segment))
@@ -274,7 +282,7 @@
         position-1
         position-2))
 
-    (define/public (get-current-track)
+    (define/override (get-current-track)
       (if (is-a? (current) switch%)
         (send (current) get-current-track)
         (current)))

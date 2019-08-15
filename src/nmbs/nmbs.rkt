@@ -62,7 +62,7 @@
 
     (define loco-speed-listeners (make-hash))
     (define/public (add-loco-speed-listener loco-id fn)
-      (if (hash-hash-key? loco-speed-listeners loco-id)
+      (if (hash-has-key? loco-speed-listeners loco-id)
         (hash-update! loco-speed-listeners loco-id (lambda (fns) (cons fn fns)))
         (hash-set! loco-speed-listeners loco-id (list fn))))
 
@@ -200,8 +200,7 @@
     (define/public (get-starting-spots)
       (hash-keys starting-spots))
 
-    (define detection-block-statuses
-      (make-hash (map (lambda (d) (cons d 'green)) (get-detection-block-ids))))
+    (define detection-block-statuses #f)
     (define (get-updates)
       (for ((db (send infrabel get-detection-block-statuses))
             #:unless (eq? (cdr db)
@@ -229,6 +228,9 @@
                   (send infrabel set-switch-position id pos)))))
       (send infrabel initialize (send setup get-id))
       (send infrabel start)
+      (set! detection-block-statuses
+        (make-hash (send infrabel get-detection-block-statuses)))
+      (find-starting-spots!)
       (thread get-updates))))
 
 
@@ -275,7 +277,7 @@
         (if (or (null? route) (null? (cdr route)) (null? (cddr route)))
           #f
           (let ((segment-1 (send (car route) get-segment))
-                (segment-2 (send segment (caddr route) get-segment)))
+                (segment-2 (send (caddr route) get-segment)))
             (eq? segment-1 segment-2))))
 
       ;(displayln route)
