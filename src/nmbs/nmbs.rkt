@@ -29,7 +29,6 @@
     (super-new)
 
     (define railway #f)
-    (define starting-spots '())
 
     (define switch-listeners '())
     (define (get-switch-listeners)
@@ -63,7 +62,9 @@
 
     (define loco-speed-listeners (make-hash))
     (define/public (add-loco-speed-listener loco-id fn)
-      (hash-set! loco-speed-listeners loco-id fn))
+      (if (hash-hash-key? loco-speed-listeners loco-id)
+        (hash-update! loco-speed-listeners loco-id (lambda (fns) (cons fn fns)))
+        (hash-set! loco-speed-listeners loco-id (list fn))))
 
     (define (get-loco id)
       (send railway get-loco id))
@@ -72,7 +73,8 @@
     (define/public (get-loco-speed id)
       (abs (send infrabel get-loco-speed id)))
     (define/public (set-loco-speed id speed)
-      ((hash-ref loco-speed-listeners id) speed)
+      (for ((notify (in-list (hash-ref loco-speed-listeners id))))
+        (notify speed))
       (send infrabel set-loco-speed id (* (send (get-loco id) get-direction) speed)))
     (define/public (change-loco-direction id)
       (send infrabel change-loco-direction id)
@@ -151,12 +153,12 @@
                 (else
                   (displayln (format "shouldn't be on ~a" db))
                  (route-iter (+ travelled (* delta speed))))))
-            (cond ((is-a? curr block%)
+            (cond ((detection-block? curr)
                    ; last iteration, loco was on a db, but no longer
                    (send loco update-location (send route next))
                    (route-iter 0))
                   ((and (> travelled (send (send route current) get-length))
-                        (not (is-a? (send route peek-next) block%)))
+                        (not (detection-block? (send route peek-next))))
                    (if (send route reverse?)
                      (reverse-loco)
                      (begin (send loco update-location (send route next))
@@ -167,10 +169,11 @@
         (route-iter 0))
       (thread start))
 
-    ;; get list of spots where a new loco can be added
-    ;; to be a valid spot, 2 connected detection blocks are needed whose
-    ;; local ids match those imported through infrabel
-    (define (find-starting-spots)
+    ;; get hash of spots where a new loco can be added,
+    ;; to be a valid spot, a detection block is needed whose local id and
+    ;; that of a connected segment match those imported through infrabel
+    (define starting-spots #f)
+    (define (find-starting-spots!)
       (let* ((db-ids (send infrabel get-detection-block-ids))
              (switch-ids (send infrabel get-switch-ids))
              (infrabel-ids (append db-ids switch-ids))
@@ -189,20 +192,27 @@
                              (and prev
                                   (cons track-id
                                         (starting-spot prev track-id))))))))
-        (for/hash ((spot (in-list spots))
-                   #:when spot)
-          (values (car spot) (cdr spot)))))
+        (set! starting-spots
+              (for/hash ((spot (in-list spots))
+                         #:when spot)
+                (values (car spot) (cdr spot))))))
 
     (define/public (get-starting-spots)
       (hash-keys starting-spots))
 
+    (define detection-block-statuses
+      (make-hash (map (lambda (d) (cons d 'green)) (get-detection-block-ids))))
     (define (get-updates)
-      (for ((db (in-list (send infrabel get-detection-block-statuses))))
-        (for ((fn (in-list detection-block-listeners)))
-          (fn (car db) (cdr db))))
+      (for ((db (send infrabel get-detection-block-statuses))
+            #:unless (eq? (cdr db)
+                          (hash-ref detection-block-statuses (car db))))
+        (hash-set! detection-block-statuses (car db) (cdr db))
+        (for ((notify (in-list detection-block-listeners)))
+          (notify (car db) (cdr db))))
       (for ((loco (in-list (get-loco-ids))))
-        ((hash-ref loco-speed-listeners loco) (get-loco-speed loco)))
-      (sleep 1)
+        (for ((notify (in-list (hash-ref loco-speed-listeners loco))))
+          (notify (get-loco-speed loco))))
+      (sleep 0.5)
       (get-updates))
 
     (define/public (initialize setup)
@@ -219,7 +229,6 @@
                   (send infrabel set-switch-position id pos)))))
       (send infrabel initialize (send setup get-id))
       (send infrabel start)
-      (set! starting-spots (find-starting-spots))
       (thread get-updates))))
 
 
