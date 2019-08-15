@@ -82,13 +82,12 @@
                  s-n5<n1-n6-n8 )
       (check-eq? (send b-n6-n7 from t-n5-n6)
                  b-n7-n8 )
-      (check-eq? (send t-n5-n1 from b-n7-n8)
-                 #f
-                 "Return #f when tracks don't connect"))
+      (check-false (send t-n5-n1 from b-n7-n8)
+                   "Return #f when tracks don't connect"))
     (test-case
       "Given a connected track, from* should return a list of tracks on the other side"
       (check-eq? (send b-n11-n12 from* b-n10-n11)
-                 '()
+                 null
                  "Return the empty list for dead ends")
       (check-equal? (send b-n1-n2 from* t-n5-n1)
                     (list t-n2-n3))
@@ -134,8 +133,8 @@
                  t-n4-n5)
       (check-eq? (send s-n5<n1-n6 from t-n4-n5)
                  b-n1-n2)
-      (check-eq? (send s-n5<n1-n6 from b-n6-n7)
-                 #f)
+      (check-false (send s-n5<n1-n6 from b-n6-n7)
+                   "Return false when not correct position")
       (send s-n5<n1-n6 change-position)
       (check-eq? (send s-n5<n1-n6 from t-n4-n5)
                  b-n6-n7)
@@ -178,12 +177,12 @@
                     (set b-n1-n2 b-n6-n7 b-n7-n8)))
     (test-case
       "Tracks can tell whether they're part of the same segment"
-      (check-eq? #t (send s-n5<n1-n6-n8 same-segment? s-n5<n1-n6))
-      (check-eq? #t (send s-n5<n1-n6-n8 same-segment? t-n5-n8))
-      (check-eq? #t (send t-n5-n1 same-segment? s-n5<n1-n6-n8))
-      (check-eq? #t (send t-n5-n1 same-segment? s-n5<n1-n6))
-      (check-eq? #f (send b-n1-n2 same-segment? s-n5<n1-n6))
-      (check-eq? #f (send b-n1-n2 same-segment? t-n2-n3)))))
+      (check-true (send s-n5<n1-n6-n8 same-segment? s-n5<n1-n6))
+      (check-true (send s-n5<n1-n6-n8 same-segment? t-n5-n8))
+      (check-true (send t-n5-n1 same-segment? s-n5<n1-n6-n8))
+      (check-true (send t-n5-n1 same-segment? s-n5<n1-n6))
+      (check-false (send b-n1-n2 same-segment? s-n5<n1-n6))
+      (check-false (send b-n1-n2 same-segment? t-n2-n3)))))
 
 
 
