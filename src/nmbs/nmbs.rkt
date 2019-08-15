@@ -53,17 +53,16 @@
 
     (define/public (initialize setup)
       (set! railway (make-object railway% setup))
-      (for-each (lambda (switch)
-                  (send switch
-                        set-callback
-                        (lambda ()
-                          (let ((id (send switch get-id))
-                                (pos (send switch get-position)))
-                            (for-each (lambda (fn)
-                                        (fn id pos))
-                                      (get-switch-listeners))
-                            (send infrabel set-switch-position id pos)))))
-                (send railway get-switches))
+      (for ((switch (in-list (send railway get-switches))))
+        (send switch
+              set-callback
+              (lambda ()
+                (let ((id (send switch get-id))
+                      (pos (send switch get-position)))
+                  (for-each (lambda (fn)
+                              (fn id pos))
+                            (get-switch-listeners))
+                  (send infrabel set-switch-position id pos)))))
       (send infrabel initialize (send setup get-id))
       (send infrabel start)
       (set! starting-spots (find-starting-spots)))
