@@ -12,17 +12,18 @@
 (define log-file (open-output-file "logs/infrabel-interface.log" #:exists 'append))
 
 (define max-attempts 10)
-(define (try-connect n)
-  (if (> n max-attempts)
-    (error (format "tcp-connect failed after ~a attempts" n))
-    (with-handlers ((exn:fail:network?
+(define (try-connect (n 1))
+  (when (>= n max-attempts)
+    (eprintf "tcp-connect failed after ~a attempts~%" n)
+    (exit))
+  (with-handlers ((exn:fail:network?
                       (lambda (exn)
-                        (printf "tcp-connect attempt ~a failed~%" n)
+                        (eprintf "tcp-connect attempt ~a failed~%" n)
                         (sleep 0.5)
                         (try-connect (add1 n)))))
-                   (tcp-connect "localhost" port))))
+                   (tcp-connect "localhost" port)))
 
-(define-values (in out) (try-connect 0))
+(define-values (in out) (try-connect))
 
 ;; Struct for sending a request over tcp
 ;; msg contains the request
