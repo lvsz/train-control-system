@@ -2,19 +2,33 @@
 
 (require racket/class
          "nmbs/nmbs.rkt"
-         "infrabel/interface.rkt"
          "gui.rkt"
-         "setup.rkt")
+         "setup.rkt"
+         (prefix-in tcp: "infrabel/interface.rkt")
+         (prefix-in local: "infrabel/infrabel.rkt"))
 
 (provide main)
 
-(define (main (setup-id #f))
-  (when (> (vector-length (current-command-line-arguments)) 0)
-    (set! setup-id (string->symbol (vector-ref (current-command-line-arguments) 0))))
+(define (main (setup-id #f) (remote #t))
+
+  (let loop ((args (vector->list (current-command-line-arguments))))
+    (unless (null? args)
+      (case (car args)
+        (("--setup")
+          (set! setup-id (string->symbol (cadr args)))
+          (loop (cddr args)))
+        (("--local")
+         (set! remote #f)
+         (loop (cdr args)))
+        (else
+         (eprintf "Unrecognized argument: " (car args))
+         (loop (cdr args))))))
 
   ;; define infrabel
   (define infrabel
-    (new infrabel%))
+    (if remote
+      (new tcp:infrabel%)
+      (new local:infrabel%)))
 
   ;; start infrabel
   ;;(send infrabel start)

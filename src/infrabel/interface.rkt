@@ -11,6 +11,9 @@
 (unless (directory-exists? "logs") (make-directory "logs"))
 (define log-file (open-output-file "logs/infrabel-interface.log" #:exists 'append))
 
+(define-values (in out)
+  (values #f #f))
+
 (define max-attempts 10)
 (define (try-connect (n 1))
   (when (>= n max-attempts)
@@ -21,9 +24,9 @@
                         (eprintf "tcp-connect attempt ~a failed~%" n)
                         (sleep 0.5)
                         (try-connect (add1 n)))))
-                   (tcp-connect "localhost" port)))
-
-(define-values (in out) (try-connect))
+                 (let-values (((i o) (tcp-connect "localhost" port)))
+                   (set! in i)
+                   (set! out o))))
 
 ;; Struct for sending a request over tcp
 ;; msg contains the request
@@ -73,6 +76,7 @@
     (super-new)
 
     (define/public (initialize setup-id)
+      (try-connect)
       (put setup-id))
 
     (define/public (start)
