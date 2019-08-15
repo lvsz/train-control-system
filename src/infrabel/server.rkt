@@ -23,21 +23,21 @@
     (let ((railway-setup-id (read in)))
       (send/apply infrabel initialize railway-setup-id))))
 
-(define (stop (exn #f))
+(define (stop exn)
   (send infrabel stop)
   (when listener
     (tcp-close listener)
     (and in (tcp-abandon-port in))
     (and out (tcp-abandon-port out))
     (send infrabel stop))
-  (cond ((not exn)
+  (cond ((eq? exn 'request)
          (log "Infrabel server stopped by request"))
         ((exn:break? exn)
          (log "Infrabel server stopped by user break"))
         ((eof-object? exn)
          (log "Infrabel server stopped by client disconnection"))
         (else
-         (log "Infrabel server stopped by unkown cause")))
+         (log (format "Infrabel server stopped by unkown cause: ~a" exn))))
   (exit))
 #|
 (define received (make-queue))
@@ -75,7 +75,7 @@
   (log "Infrabel server activated")
   (let loop ((msg (get-msg)))
     (when (eof-object? msg)
-      (stop))
+      (stop msg))
     (let ((method (car msg))
           (args (cdr msg)))
       (case method
@@ -104,7 +104,7 @@
         ((start)
          (thread (lambda () (send infrabel start))))
         ((stop)
-         (stop)))
+         (stop 'request)))
       (loop (get-msg)))))
 
 (define (start)
