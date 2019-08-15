@@ -83,20 +83,15 @@
     (test-suite
       "Random tests"
       (let ((no-switches (filter (lambda (x) (not (switch? x))) (send railway get-tracks))))
-        (let loop ((i 50))
-          (when (> i 0)
-            (let* ((from (random-ref no-switches))
-                   (to (random-ref no-switches))
-                   (avoid (random-sample no-switches (random 1 10)))
-                   (r&d (send railway get-route&distance from to))
-                   (alt-r&d (send railway get-alt-route&distance from to avoid)))
-              (if alt-r&d
-                (begin (check (lambda (a b) (<= (cdr a) (cdr b)))
-                              r&d
-                              alt-r&d
-                              (format "from: ~a, to: ~a, avoid: ~a" from to avoid))
-                       (loop (sub1 i)))
-                (loop i)))))))))
+        (for ((_ (in-range 50)))
+          (let ((from (random-ref no-switches))
+                (to (random-ref no-switches))
+                (avoid (random-sample no-switches (random 1 10))))
+            (let-values
+              (((route-1 dist-1) (send railway get-route&distance from to))
+               ((route-2 dist-2) (send railway get-alt-route&distance from to avoid)))
+              (check <= dist-1 dist-2
+                     (format "regular: ~a, alt: ~a, avoid: ~a" route-1 route-2 avoid)))))))))
 
 (for-each run-tests (list basic-tests
                           component-tests

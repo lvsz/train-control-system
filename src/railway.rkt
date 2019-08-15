@@ -109,27 +109,30 @@
       (filter (lambda (t) (not (is-a? t switch%))) (get-tracks)))
     (define routes&distances (make-hash))
 
-    (define (mk-route&distance to route&distance)
-      (define (mk curr route)
-        (let* ((prev (car (hash-ref route&distance curr))))
+    (define (unfold-route to route&distance)
+      (define (unfold curr route)
+        (let ((prev (car (hash-ref route&distance curr))))
           (if (null? prev)
-            (cons (cons curr route) (cdr (hash-ref route&distance to)))
-            (mk prev (cons curr route)))))
-      (mk to '()))
-
+            (cons curr route)
+            (unfold prev (cons curr route)))))
+      (unfold to '()))
 
     (define/public (get-route&distance from to)
       (when (switch? from)
         (set! from (send from get-current-track)))
       (unless (hash-has-key? routes&distances from)
         (hash-set! routes&distances from (dijkstra from no-switches)))
-      (mk-route&distance to (hash-ref routes&distances from)))
+      (let ((r&d (hash-ref routes&distances from)))
+        (values (unfold-route to r&d) (cdr (hash-ref r&d to)))))
 
     (define/public (get-route from to)
-      (car (get-route&distance from to)))
+      (let-values (((route dist) (get-route&distance from to)))
+        route))
 
     (define/public (get-distance from to)
-      (cdr (get-route&distance from to)))
+      (unless (hash-has-key? routes&distances from)
+        (hash-set! routes&distances from (dijkstra from no-switches)))
+      (cdr (hash-ref (hash-ref routes&distances from) to)))
 
     (define/public (get-alt-route&distance from to avoid)
       (when (switch? from)
@@ -141,12 +144,12 @@
                                     s)))))
              (alt (dijkstra from no-switches avoid*)))
         (if (null? (car (hash-ref alt to)))
-          #f
-          (mk-route&distance to alt))))
+          (values #f +inf.0)
+          (values (unfold-route to alt) (cdr (hash-ref alt to))))))
 
     (define/public (get-alt-route from to avoid)
-      (let ((route&dist (get-alt-route&distance from to avoid)))
-        (and route&dist (car route&dist))))))
+      (let-values (((route dist) (get-alt-route&distance from to avoid)))
+        route))))
 
 (define (dijkstra start tracks (avoid '()))
   (define distances (make-hash (map (lambda (t) (cons t +inf.0)) tracks)))
