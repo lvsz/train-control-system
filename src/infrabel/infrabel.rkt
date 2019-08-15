@@ -80,6 +80,8 @@
       (sim:get-switch-position id))
     (define/public (set-switch-position id position)
       (sim:set-switch-position! id position))
+    (define/public (get-switch-ids)
+      (sim:get-switch-ids))
 
     (define/public (get-detection-block-ids)
       (sim:get-detection-block-ids))

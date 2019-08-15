@@ -30,9 +30,14 @@
     (and in (tcp-abandon-port in))
     (and out (tcp-abandon-port out))
     (send infrabel stop))
-  (if exn
-    (log "Infrabel server killed by user break")
-    (log "Infrabel server killed by request"))
+  (cond ((not exn)
+         (log "Infrabel server stopped by request"))
+        ((exn:break? exn)
+         (log "Infrabel server stopped by user break"))
+        ((eof-object? exn)
+         (log "Infrabel server stopped by client disconnection"))
+        (else
+         (log "Infrabel server stopped by unkown cause")))
   (exit))
 #|
 (define received (make-queue))
@@ -69,6 +74,8 @@
 (define (run)
   (log "Infrabel server activated")
   (let loop ((msg (get-msg)))
+    (when (eof-object? msg)
+      (stop))
     (let ((method (car msg))
           (args (cdr msg)))
       (case method
@@ -88,6 +95,8 @@
          (reply (send/apply infrabel get-switch-position args)))
         ((set-switch-position)
          (send/apply infrabel set-switch-position args))
+        ((get-switch-ids)
+         (reply (send infrabel get-switch-ids)))
         ((get-detection-block-ids)
          (reply (send infrabel get-detection-block-ids)))
         ((get-detection-block-statuses)
@@ -95,8 +104,7 @@
         ((start)
          (thread (lambda () (send infrabel start))))
         ((stop)
-         (stop)
-         (kill-thread (current-thread))))
+         (stop)))
       (loop (get-msg)))))
 
 (define (start)

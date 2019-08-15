@@ -45,28 +45,6 @@
                                    (list-ref setups idx))
                              (callback)))))))))))
 
-;; subpanel used to add new locomotives
-;; uses a list of tracks that have the same id in both nmbs & simulator
-(define add-loco-panel%
-  (class panel%
-    (init-field add-loco starting-spots callback)
-    (super-new (enabled #t)
-               (min-height 50)
-               (alignment '(center top)))
-
-    (new choice%
-         (label "Add new locomotive to track")
-         (choices (map (lambda (starting-spot)
-                         (symbol->string (send starting-spot get-id)))
-                       starting-spots))
-         (parent this)
-         (callback
-           (lambda (choice evt)
-             (let ((idx (send choice get-selection)))
-               (when idx
-                 (let ((id (gensym "L")))
-                   (add-loco id (list-ref starting-spots idx))
-                   (callback id)))))))))
 
 
 ;; subpanel used to select a locomotive
@@ -136,31 +114,40 @@
         #f
         (car loco-list)))
 
-    ; initialize creation menu
+    (define starting-spots
+      (sort (send nmbs get-starting-spots) id<?))
+
+    ;; subpanel used to add new locomotives
+    ;; uses a list of tracks that have the same id in both nmbs & simulator
     (define add-loco-menu
-      (new add-loco-panel%
-           (parent this)
-           (add-loco (lambda (id track)
-                       (send nmbs add-loco id track)))
-           (starting-spots (send nmbs get-starting-spots))
-           (callback (lambda (loco-id)
-                       ; new loco is added, get updated list first
-                       (set! loco-list (send nmbs get-loco-ids))
-                       ; update loco speeds
-                       (for-each (lambda (loco)
-                                   (hash-set! loco-speeds
-                                              loco
-                                              (send nmbs get-loco-speed loco)))
-                                 loco-list)
-                       ; get selection menu to include new loco
-                       (send loco-select-menu add-loco loco-id)
-                       ; set new loco to active loco
-                       (set! active-loco loco-id)))))
+      (new choice%
+         (label "Add new locomotive to track")
+         (choices (map (lambda (starting-spot)
+                         (symbol->string starting-spot))
+                       starting-spots))
+         (parent this)
+         (callback
+           (lambda (choice evt)
+             (let ((idx (send choice get-selection)))
+               (when idx
+                 (let ((id (send nmbs add-loco (list-ref starting-spots idx))))
+                   ; new loco is added, get updated list first
+                   (set! loco-list (send nmbs get-loco-ids))
+                   ; update loco speeds
+                   (for-each (lambda (loco)
+                               (hash-set! loco-speeds
+                                          loco
+                                          (send nmbs get-loco-speed loco)))
+                             loco-list)
+                   ; get selection menu to include new loco
+                   (send loco-select-menu add-loco id)
+                   ; set new loco to active loco
+                   (set! active-loco id))))))))
 
     ; initialize selection menu
     (define loco-select-menu
       (new loco-select-panel%
-           (parent add-loco-menu)
+           (parent this)
            (locos loco-list)
            (callback (lambda (loco-id)
                        ; set active loco to selected loco

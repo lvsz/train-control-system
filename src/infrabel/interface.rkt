@@ -97,6 +97,8 @@
       (get 'get-switch-position id))
     (define/public (set-switch-position id position)
       (put 'set-switch-position id position))
+    (define/public (get-switch-ids)
+      (get 'get-switch-ids))
 
     (define/public (get-detection-block-ids)
       (get 'get-detection-block-ids))

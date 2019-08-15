@@ -17,6 +17,9 @@
         (eq? node-1-2 node-2-1)
         (eq? node-1-2 node-2-2))))
 
+(define (nub lst)
+  (set->list (list->set lst)))
+
 (define node%
   (class object%
     (init-field id)
@@ -214,7 +217,8 @@
       (send (current) get-nodes))
 
     (define/override (get-connected-tracks)
-      (send (current) get-connected-tracks))
+      (nub (append (send position-1 get-connected-tracks)
+                   (send position-2 get-connected-tracks))))
 
     (define/public (get-positions (from #f))
       (flatten (list (if (is-a? position-1 switch%)

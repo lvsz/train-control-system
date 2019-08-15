@@ -8,8 +8,7 @@
          "../adts.rkt"
          "../priority-queue.rkt")
 
-(provide nmbs%
-         starting-spot%)
+(provide nmbs%)
 
 ;; METHODS:
 ; initialize
@@ -106,11 +105,14 @@
       (send infrabel change-loco-direction id)
       (send (get-loco id) change-direction))
 
-    (define/public (add-loco id starting-spot)
-      (let ((curr-id (get-field current-track starting-spot))
-            (next-id (get-field next-track starting-spot)))
-        (send infrabel add-loco id next-id curr-id)
-        (send railway add-loco id (get-track next-id) (get-track curr-id))))
+    (define/public (add-loco spot-id)
+      (let* ((spot (hash-ref starting-spots spot-id))
+             (curr-id (starting-spot-current spot))
+             (prev-id (starting-spot-previous spot))
+             (id (gensym "L")))
+        (send infrabel add-loco id prev-id curr-id)
+        (send railway add-loco id (get-track prev-id) (get-track curr-id))
+        id))
 
     (define/public (route loco-id end-id)
       (define end (get-track end-id))
@@ -197,39 +199,36 @@
     ;; to be a valid spot, 2 connected detection blocks are needed whose
     ;; local ids match those imported through infrabel
     (define (find-starting-spots)
-      (let ((infrabel-ids (send infrabel get-detection-block-ids)))
-        (filter-map
-          ; lambda creates a starting-spot from a valid track-id
-          ; invalid ones return #f which gets filtered by filter-map
-          (lambda (track-id)
-            ; first check if current track id is also found in infrabel
-            (and (memq track-id infrabel-ids)
-                 (let* ((track (get-track track-id))
-                        ; get ids from tracks connected to current track
-                        (ids (map (lambda (t)
-                                    (send t get-id))
-                                  (send track get-connected-tracks)))
-                        ; check if any connected track can be found in infrabel
-                        (result (findf (lambda (x) (memq x infrabel-ids)) ids)))
-                   ; create & return starting-spot object if result was a match
-                   (and result
-                        (make-object starting-spot% track-id result)))))
-          (get-track-ids))))
+      (let* ((db-ids (send infrabel get-detection-block-ids))
+             (switch-ids (send infrabel get-switch-ids))
+             (infrabel-ids (append db-ids switch-ids))
+             (spots (for/list ((track-id (get-detection-block-ids)))
+                      (and (memq track-id infrabel-ids)
+                           (let* ((track (get-track track-id))
+                                  ; get ids from tracks connected to current track
+                                  (ids (map (lambda (t)
+                                              (send t get-id))
+                                            (send track get-connected-tracks)))
+                                  ; check if any connected track can be found in infrabel
+                                  (prev (findf (lambda (x)
+                                                 (memq x infrabel-ids))
+                                               ids)))
+                             ; create & return starting-spot object if result was a match
+                             (and prev
+                                  (cons track-id
+                                        (starting-spot prev track-id))))))))
+        (for/hash ((spot (in-list spots))
+                   #:when spot)
+          (values (car spot) (cdr spot)))))
 
     (define/public (get-starting-spots)
-      starting-spots)))
+      (hash-keys starting-spots))))
 
 
-;; simple class that defines a spot where a locomotive can be added
+;; simple struct that defines a spot where a locomotive can be added
 ;; like in the simulator, it needs a track for the train to start on
 ;; and a connected track to determine its direction
-(define starting-spot%
-  (class object%
-    (init-field current-track next-track)
-    (super-new)
-    (define/public (get-id)
-      current-track)))
-      ;(string->symbol (format "~a → ~a" current-track next-track)))))
+(struct starting-spot (previous current))
 
 (define route%
   (class object%
