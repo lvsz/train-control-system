@@ -96,8 +96,8 @@
       (define loco-previous-track (send loco get-previous-track))
       (define route (make-object route% railway loco end))
       (define direction (send loco get-direction))
-      (when (eq? (get-field segment (send route peek-next))
-                 (get-field segment loco-previous-track))
+      (when (eq? (send (send route peek-next) get-segment)
+                 (send loco-previous-track get-segment))
         (set! direction (- direction))
         (change-loco-direction loco-id))
       (define speed 100)
@@ -263,9 +263,9 @@
 
     (define (set-switches)
       (let loop ((next (cdr route))
-                 (visited (list (get-field segment (car route)))))
+                 (visited (list (send (car route) get-segment))))
         (unless (null? next)
-          (let ((segment (get-field segment (car next))))
+          (let ((segment (send (car next) get-segment)))
             (when (and (is-a? segment switch%)
                        (not (memq segment visited)))
               (send segment set-current-track (car next))
@@ -274,8 +274,8 @@
       (define/public (reverse?)
         (if (or (null? route) (null? (cdr route)) (null? (cddr route)))
           #f
-          (let ((segment-1 (get-field segment (car route)))
-                (segment-2 (get-field segment (caddr route))))
+          (let ((segment-1 (send (car route) get-segment))
+                (segment-2 (send segment (caddr route) get-segment)))
             (eq? segment-1 segment-2))))
 
       ;(displayln route)

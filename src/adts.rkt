@@ -10,6 +10,7 @@
          detection-block%
          switch%
          loco%
+         track?
          switch?
          detection-block?)
 
@@ -22,6 +23,9 @@
         (eq? node-1-1 node-2-2)
         (eq? node-1-2 node-2-1)
         (eq? node-1-2 node-2-2))))
+
+(define (track? segment)
+  (is-a? segment track%))
 
 (define (switch? segment)
   (is-a? segment switch%))
@@ -81,11 +85,14 @@
     (define/public (get-length)
       length)
 
+    (define/public (get-segment)
+      segment)
+
     (define/public (get-nodes)
       (values node-1 node-2))
 
     (define/public (from track)
-      (let ((segment (get-field segment track))
+      (let ((segment (send track get-segment))
             (connected (get-connected-tracks)))
         (if (or (null? connected)
                 (null? (cdr connected))
@@ -97,9 +104,9 @@
       (let (; options going forwards
             (fwd (from track))
             ; options when reversing on this track
-            (rev (if (is-a? (get-field segment track) switch%)
+            (rev (if (is-a? (send track get-segment) switch%)
                    (filter (lambda (p) (connected? this p))
-                           (remq track (send (get-field segment track)
+                           (remq track (send (send track get-segment)
                                              get-positions)))
                    '())))
         (cond ((not fwd)
@@ -137,7 +144,7 @@
       (set! segment switch))
 
     (define/public (same-segment? track)
-      (eq? segment (get-field segment track)))
+      (eq? segment (send track get-segment)))
 
     (define/public (custom-write port)
       (write (cons 'track% id) port))
