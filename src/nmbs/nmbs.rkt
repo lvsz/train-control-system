@@ -200,7 +200,13 @@
     (define/public (get-starting-spots)
       (hash-keys starting-spots))
 
+
     (define detection-block-statuses #f)
+    (define (detection-block-statuses!)
+      (set! detection-block-statuses
+        (make-hash (map (lambda (x) (cons x 'green))
+                        (get-detection-block-ids)))))
+
     (define (get-updates)
       (for ((db (send infrabel get-detection-block-statuses))
             #:unless (eq? (cdr db)
@@ -228,8 +234,7 @@
                   (send infrabel set-switch-position id pos)))))
       (send infrabel initialize (send setup get-id))
       (send infrabel start)
-      (set! detection-block-statuses
-        (make-hash (send infrabel get-detection-block-statuses)))
+      (detection-block-statuses!)
       (find-starting-spots!)
       (thread get-updates))))
 

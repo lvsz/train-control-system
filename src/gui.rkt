@@ -232,32 +232,24 @@
                (min-width 120)
                (stretchable-width #f)
                (alignment '(center top)))
-    (define detection-blocks
+    (define detection-block-gfx
       (for/list ((db (in-list (sort (send nmbs get-detection-block-ids) id<?))))
         (make-object db-light% (symbol->string db) (new bitmap-dc%))))
     (define dbs
       (for/hash ((db (in-list (sort (send nmbs get-detection-block-ids) id<?)))
-                 (l (in-list detection-blocks)))
+                 (l (in-list detection-block-gfx)))
+        (send l set-status 'green)
         (values db l)))
     (define canvas
       (new canvas% (parent this)
            (paint-callback (lambda (canvas dc)
-                             (for ((light (in-list detection-blocks))
+                             (for ((light (in-list detection-block-gfx))
                                    (i (in-range 3 1000 23)))
                                (send dc draw-bitmap (send light get-bmp) 0 i))))))
     (define (change-db id status)
       (send (hash-ref dbs id) set-status status)
       (send canvas refresh))
-    (send nmbs add-detection-block-listener change-db)
-
-    (define bmp (make-bitmap 1080 120))
-    ;(define dc )
-    ;(for* ((i 30) (j 30))
-      ;(send dc set-pixel i j (make-color 0 255 0)))
-    ;(send dc set-background (make-color 0 255 0))
-    ;(send dc clear)
-    ;(send dc draw-text "hello" 5 5)
-    ))
+    (send nmbs add-detection-block-listener change-db)))
 
 (define setup-window%
   (class frame%
