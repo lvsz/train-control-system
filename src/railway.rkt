@@ -2,6 +2,7 @@
 
 (require racket/class
          racket/set
+         racket/list
          "adts.rkt"
          "priority-queue.rkt")
 
@@ -109,17 +110,17 @@
     (define routes&distances (make-hash))
 
     (define (mk-route&distance to route&distance)
-      (define (mk curr route dist-so-far)
-        (let* ((prev&dist (hash-ref route&distance curr))
-               (prev (car prev&dist))
-               (dist (+ dist-so-far (cdr prev&dist))))
+      (define (mk curr route)
+        (let* ((prev (car (hash-ref route&distance curr))))
           (if (null? prev)
-            (cons (cons curr route) dist)
-            (mk prev (cons curr route) dist))))
-      (mk to '() 0))
+            (cons (cons curr route) (cdr (hash-ref route&distance to)))
+            (mk prev (cons curr route)))))
+      (mk to '()))
 
 
     (define/public (get-route&distance from to)
+      (when (switch? from)
+        (set! from (send from get-current-track)))
       (unless (hash-has-key? routes&distances from)
         (hash-set! routes&distances from (dijkstra from no-switches)))
       (mk-route&distance to (hash-ref routes&distances from)))
@@ -131,10 +132,21 @@
       (cdr (get-route&distance from to)))
 
     (define/public (get-alt-route&distance from to avoid)
-      (let ((alt (dijkstra from (set-subtract no-switches avoid) avoid)))
+      (when (switch? from)
+        (set! from (send from get-current-track)))
+      (let* ((avoid* (flatten (for/list ((t (in-list avoid)))
+                                (let ((s (send t get-segment)))
+                                  (if (switch? s)
+                                    (send s get-positions)
+                                    s)))))
+             (alt (dijkstra from no-switches avoid*)))
         (if (null? (car (hash-ref alt to)))
           #f
-          (mk-route&distance to alt))))))
+          (mk-route&distance to alt))))
+
+    (define/public (get-alt-route from to avoid)
+      (let ((route&dist (get-alt-route&distance from to avoid)))
+        (and route&dist (car route&dist))))))
 
 (define (dijkstra start tracks (avoid '()))
   (define distances (make-hash (map (lambda (t) (cons t +inf.0)) tracks)))
