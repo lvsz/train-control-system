@@ -93,6 +93,9 @@
     (define/public (get-segment)
       segment)
 
+    (define/public (get-segment-id)
+      (send segment get-id))
+
     (define/public (get-nodes)
       (values node-1 node-2))
 
