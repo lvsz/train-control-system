@@ -51,7 +51,8 @@
       (send railway get-detection-block-ids))
 
     (define/public (get-switch-position id)
-      (send (send railway get-switch id) get-position))
+      (send infrabel get-switch-position id))
+      ;(send (send railway get-switch id) get-position))
     (define/public (set-switch-position id int)
       (send (send railway get-switch id) set-position int))
     (define/public (change-switch-position id)
@@ -95,13 +96,15 @@
       (define loco-current-track (send loco get-current-track))
       (define loco-previous-track (send loco get-previous-track))
       (define route (make-object route% railway loco end))
+      (define route-ids (for/list ((r (in-list (send route get-route))))
+                          (send r get-id)))
       (define direction (send loco get-direction))
       (when (eq? (send (send route peek-next) get-segment)
                  (send loco-previous-track get-segment))
         (set! direction (- direction))
         (change-loco-direction loco-id))
-      (define speed 100)
-      (define interval 0.1)
+      (define speed 40)
+      (define interval 0.01)
       (define clearance (/ 100 speed))
       (set-loco-speed loco-id speed)
       (define (loco-speed-changed new-speed)
@@ -125,13 +128,7 @@
                         (set! last-update (current-milliseconds))
                         (/ (- last-update old-update) 1000.0)))
         (let ((curr (send loco get-current-track))
-              ;(prev (send loco get-previous-track))
               (db? (get-loco-detection-block loco-id)))
-          ;(displayln (cons 'curr curr))
-          ;(displayln (cons 'expected (send route current)))
-          ;(displayln (cons 'next (send route peek-next)))
-          ;(displayln (cons 'travelled travelled))
-          ;(newline)
           (if db?
             ; if loco is on db
             (let ((db (get-track db?)))
@@ -208,6 +205,8 @@
                         (get-detection-block-ids)))))
 
     (define (get-updates)
+      (for ((loco (in-list (send railway get-loco-ids))))
+        (get-loco-detection-block loco))
       (for ((db (send infrabel get-detection-block-statuses))
             #:unless (eq? (cdr db)
                           (hash-ref detection-block-statuses (car db))))
@@ -222,21 +221,24 @@
 
     (define/public (initialize setup)
       (set! railway (make-object railway% setup))
-      (for ((switch (in-list (send railway get-switches))))
-        (send switch
-              set-callback
-              (lambda ()
-                (let ((id (send switch get-id))
-                      (pos (send switch get-position)))
-                  (for-each (lambda (fn)
-                              (fn id pos))
-                            (get-switch-listeners))
-                  (send infrabel set-switch-position id pos)))))
       (send infrabel initialize (send setup get-id))
       (send infrabel start)
+      (for ((switch (in-list (send railway get-switches))))
+        (let ((id (send switch get-id)))
+          ;(send switch set-position (send infrabel get-switch-position id))
+          (send switch
+                set-callback
+                (lambda ()
+                  (let ((pos (send switch get-position)))
+                    (for-each (lambda (fn)
+                                (fn id pos))
+                              (get-switch-listeners))
+                    (send infrabel set-switch-position id pos))))))
       (detection-block-statuses!)
       (find-starting-spots!)
-      (thread get-updates))))
+      (thread (lambda ()
+                (sleep 1)
+                (get-updates))))))
 
 
 ;; simple struct that defines a spot where a locomotive can be added
@@ -252,6 +254,9 @@
 
     (define route
       (send railway get-route from to))
+
+    (define/public (get-route)
+      route)
 
     (define/public (current)
       (car route))
@@ -273,7 +278,7 @@
                  (visited (list (send (car route) get-segment))))
         (unless (null? next)
           (let ((segment (send (car next) get-segment)))
-            (when (and (is-a? segment switch%)
+            (when (and (switch? segment)
                        (not (memq segment visited)))
               (send segment set-current-track (car next))
               (loop (cdr next) (cons segment visited)))))))
@@ -285,5 +290,4 @@
                 (segment-2 (send (caddr route) get-segment)))
             (eq? segment-1 segment-2))))
 
-      ;(displayln route)
       (set-switches)))

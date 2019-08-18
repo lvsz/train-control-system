@@ -3,7 +3,8 @@
 (require racket/tcp
          racket/date
          racket/class
-         "infrabel.rkt")
+         "infrabel.rkt"
+         "../logger.rkt")
 
 (define infrabel (new infrabel%))
 
@@ -12,16 +13,11 @@
 (define in #f)
 (define out #f)
 
-(unless (directory-exists? "logs") (make-directory "logs"))
-(define log-file (open-output-file "logs/infrabel-server.log" #:exists 'append))
-
 (define (setup)
   (set! listener (tcp-listen port 4 #t))
   (let-values (((_in _out) (tcp-accept listener)))
     (set! in _in)
-    (set! out _out)
-    (let ((railway-setup-id (read in)))
-      (send/apply infrabel initialize railway-setup-id))))
+    (set! out _out)))
 
 (define (stop exn)
   (send infrabel stop)
@@ -39,27 +35,6 @@
         (else
          (log (format "Infrabel server stopped by unkown cause: ~a" exn))))
   (exit))
-#|
-(define received (make-queue))
-(define listener
-  (thread (lambda ()
-            (let loop ((msg (read in)))
-              (set! received (cons msg received))
-              (when (thread-try-receive)
-                (set!
-              (loop (read in))))))
-
-(define (get-msg)
-  (define msg #f)
-  (thread-send listener (lambda (x) (set! msg x)))
-  (let loop ()
-    (cond (msg
-            (log (format "received message: ~a" msg))
-            msg
-            (else
-              (sleep 0.1)
-              (loop))))))
-|#
 
 (define (get-msg)
   (let ((msg (read in)))
@@ -101,36 +76,28 @@
          (reply (send infrabel get-detection-block-ids)))
         ((get-detection-block-statuses)
          (reply (send infrabel get-detection-block-statuses)))
+        ((reserve-route)
+         (reply (send/apply infrabel reserve-route args)))
+        ((initialize)
+         (reply (send/apply infrabel initialize args)))
         ((start)
          (thread (lambda () (send infrabel start))))
         ((stop)
          (stop 'request)))
       (loop (get-msg)))))
 
-(define (start)
-  (send infrabel start)
-  (thread run))
+(define (initialize)
+  (let loop ((msg (get-msg)))
+    (case (car msg)
+      ((initialize) (reply (send/apply infrabel initialize (cdr msg)))
+                    (loop (get-msg)))
+      ((start)      (send infrabel start)
+                    (thread run))
+      (else         (displayln (cons 'ingored msg))
+                    (loop (get-msg))))))
 
-(define (time-string)
-  (define (pad-zeroes n)
-    (if (< n 10)
-      (string-append "0" (number->string n))
-      (number->string n)))
-  (let ((current-time (current-date)))
-    (format "(~a:~a:~a) "
-            (pad-zeroes (date-hour current-time))
-            (pad-zeroes (date-minute current-time))
-            (pad-zeroes (date-second current-time)))))
-
-(define (log msg)
-  (display (time-string) log-file)
-  (displayln msg log-file)
-  (flush-output log-file))
+(define log (make-logger "infrabel-server.log"))
 
 (with-handlers ((exn:break? stop))
                (setup)
-               (let loop ((msg (get-msg)))
-                 (if (apply eq? 'start msg)
-                   (void (start))
-                   (begin (printf "Ignoring message: ~a~%" msg)
-                          (loop (get-msg))))))
+               (initialize))

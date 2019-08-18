@@ -18,6 +18,7 @@
     (define switches (make-hash))
     (define blocks (make-hash))
     (define locos (make-hash))
+    (define segments #f)
 
     (define/public (get-node id)
       (hash-ref nodes id))
@@ -45,10 +46,17 @@
     (define/public (get-detection-block-ids)
       (hash-keys blocks))
 
+    (define/public (get-segment-ids)
+      (hash-keys segments))
+    (define/public (get-segments)
+      (hash-values segments))
+
     (define/public (get-loco id)
       (hash-ref locos id))
     (define/public (get-loco-ids)
       (hash-keys locos))
+    (define/public (get-locos)
+      (hash-values locos))
     (define (public-add-loco id prev-segment curr-segment)
       (let ((new-loco (make-object loco% id prev-segment curr-segment)))
         (hash-set! locos id new-loco)
@@ -77,8 +85,8 @@
         (hash-set! tracks id block)
         (hash-set! blocks id block)))
 
-    (define (add-loco id track)
-      (hash-set! locos id (make-object loco% id track)))
+    (define (add-loco id prev-track curr-track)
+      (hash-set! locos id (make-object loco% id prev-track curr-track)))
 
     (define read-id string->symbol)
     (define read-number string->number)
@@ -102,7 +110,7 @@
                     (list read-id read-track read-track)
                     params))
           ((L) (add add-loco
-                    (list read-id read-track)
+                    (list read-id read-track read-track)
                     params)))))
 
     (define no-switches
@@ -128,6 +136,11 @@
                 (loop (cddr route)))
               (begin (set! improved-route (cons t1 improved-route))
                      (loop (cdr route))))))))
+
+    (set! segments
+          (for/hash (((id track) (in-hash tracks))
+                     #:when (eq? track (send track get-segment)))
+            (values id track)))
 
     (define (unfold-route to route&distance)
       (define (unfold curr route)

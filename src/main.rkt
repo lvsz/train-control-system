@@ -45,8 +45,10 @@
                      (atexit (lambda () (send infrabel stop)))))
               (else
                 (new setup-window%
-                     (nmbs nmbs)
                      (setups setups)
-                     (atexit (lambda () (send infrabel stop))))))))
+                     (callback (lambda (setup)
+                                 (send nmbs initialize setup)
+                                 (new window% (nmbs nmbs)
+                                      (atexit (lambda () (send infrabel stop)))))))))))
 
 (main)

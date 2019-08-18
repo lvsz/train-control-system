@@ -4,7 +4,8 @@
 
 (require racket/tcp
          racket/date
-         racket/class)
+         racket/class
+         "../logger.rkt")
 
 (define port (call-with-input-file "resources/tcp-port.txt" read))
 
@@ -77,7 +78,7 @@
 
     (define/public (initialize setup-id)
       (try-connect)
-      (put setup-id))
+      (get 'initialize setup-id))
 
     (define/public (start)
       (put 'start))
@@ -108,20 +109,10 @@
     (define/public (get-detection-block-ids)
       (get 'get-detection-block-ids))
     (define/public (get-detection-block-statuses)
-      (get 'get-detection-block-statuses))))
+      (get 'get-detection-block-statuses))
 
-(define (time-string)
-  (define (pad-zeroes n)
-    (if (< n 10)
-      (string-append "0" (number->string n))
-      (number->string n)))
-  (let ((current-time (current-date)))
-    (format "(~a:~a:~a) "
-            (pad-zeroes (date-hour current-time))
-            (pad-zeroes (date-minute current-time))
-            (pad-zeroes (date-second current-time)))))
+    (define/public (reserve-route loco-id route)
+      (get 'reserve-route loco-id route))))
 
-(define (log msg)
-  (display (time-string) log-file)
-  (displayln msg log-file)
-  (flush-output log-file))
+(define log (make-logger "infrabel-interface.log"))
+

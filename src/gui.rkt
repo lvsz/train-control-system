@@ -30,20 +30,7 @@
                (min-height 50)
                (alignment '(center top)))
 
-    (define setup-select-menu
-      (new choice%
-           (label "Current setup")
-           (choices (map (lambda (x) (symbol->string (send x get-id))) setups))
-           (parent this)
-           (vert-margin 20)
-           (callback
-             (lambda (choice evt)
-               (thread (lambda ()
-                         (let ((idx (send choice get-selection)))
-                           (when idx
-                             (send nmbs initialize
-                                   (list-ref setups idx))
-                             (callback)))))))))))
+    ))
 
 ;; main panel for the user to control locomotives
 (define loco-panel%
@@ -56,7 +43,7 @@
                (alignment '(right top)))
 
     ; list that keeps all loco ids
-    (define locos '())
+    (define locos (send nmbs get-loco-ids))
 
     ; no active loco when there are no locos
     ; otherwise default to first one in list
@@ -72,6 +59,8 @@
       (lambda (speed)
         (when (eq? id active-loco)
           (send speed-slider set-value speed))))
+    (for ((loco (in-list locos)))
+      (send nmbs add-loco-speed-listener loco (mk-listener loco)))
 
     ;; subpanel used to add new locomotives
     ;; uses a list of tracks that have the same id in both nmbs & simulator
@@ -253,7 +242,7 @@
 
 (define setup-window%
   (class frame%
-    (init-field nmbs setups (atexit void))
+    (init-field setups callback)
     (init (width 100) (height 100))
     (super-new (label "Pick a setup"))
 
@@ -261,15 +250,18 @@
       (new vertical-panel% (parent this)))
 
     (define setup-panel
-      (new pick-setup-panel%
-           (setups setups)
-           (nmbs nmbs)
+      (new choice%
+           (label "Current setup")
+           (choices (map (lambda (x) (symbol->string (send x get-id))) setups))
            (parent parent-panel)
-           (callback (lambda ()
-                       (new window%
-                            (nmbs nmbs)
-                            (atexit atexit))
-                       (show #f)))))
+           (vert-margin 20)
+           (callback
+             (lambda (choice evt)
+               (thread (lambda ()
+                         (let ((idx (send choice get-selection)))
+                           (when idx
+                             (callback (list-ref setups idx))
+                             (show #f)))))))))
     (inherit show)
     (show #t)))
 
