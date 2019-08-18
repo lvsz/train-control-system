@@ -1,5 +1,7 @@
 #lang racket/base
 
+(provide start-server)
+
 (require racket/tcp
          racket/date
          racket/class
@@ -93,8 +95,9 @@
 
 (define log (make-logger "infrabel-server.log"))
 
-(with-handlers ((exn:break? stop))
-               (send infrabel initialize (setup))
-               (begin0 (send infrabel start)
-                       (sleep 0.1)
-                       (thread run)))
+(define (start-server)
+  (with-handlers ((exn:break? stop))
+                 (send infrabel initialize (setup))
+                 (begin0 (send infrabel start)
+                         (sleep 0.1)
+                         (thread run))))

@@ -237,7 +237,7 @@
       (detection-block-statuses!)
       (find-starting-spots!)
       (thread (lambda ()
-                (sleep 1)
+                (sleep 0.5)
                 (get-updates))))))
 
 
