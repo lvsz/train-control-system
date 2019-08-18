@@ -78,10 +78,10 @@
 
     (define/public (initialize setup-id)
       (try-connect)
-      (get 'initialize setup-id))
+      (put 'initialize setup-id))
 
     (define/public (start)
-      (put 'start))
+      (void))
     (define/public (stop)
       (put 'stop))
 
