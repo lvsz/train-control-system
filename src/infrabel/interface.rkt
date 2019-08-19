@@ -112,7 +112,9 @@
       (get 'get-detection-block-statuses))
 
     (define/public (reserve-route loco-id route)
-      (get 'reserve-route loco-id route))))
+      (get 'reserve-route loco-id route))
+    (define/public (finished-route loco-id)
+      (put 'finished-route loco-id))))
 
 (define log (make-logger "infrabel-interface.log"))
 

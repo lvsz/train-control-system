@@ -105,11 +105,21 @@
                            (send nmbs get-loco-speed loco)))))))))
 
     (define (add-loco-to-menu! id)
-      (when (null? locos)
+      (when (empty? locos)
         (send loco-select-menu delete 0))
       (set! locos (append locos (list id)))
       (send loco-select-menu append (symbol->string id))
       (send loco-select-menu set-selection (sub1 (length locos))))
+
+    (define (remove-loco-from-menu!)
+      (when active-loco
+        (set! locos (remq active-loco locos))
+        (send loco-select-menu delete (send loco-select-menu get-selection))
+        (if (empty? locos)
+          (begin (set! active-loco #f)
+                 (send loco-select-menu append "---"))
+          (set! active-loco (list-ref locos (send loco-select-menu get-selection))))))
+
 
     (define loco-control
       (new vertical-pane%
@@ -145,6 +155,17 @@
              (lambda (btn evt)
                (when active-loco
                  (send nmbs change-loco-direction active-loco))))))
+
+    (define remove-button
+      (new button%
+           (label "Remove")
+           (parent loco-control)
+           (enabled #t)
+           (callback
+             (lambda (btn evt)
+               (when active-loco
+                 (send nmbs remove-loco active-loco)
+                 (remove-loco-from-menu!))))))
 
     (define detection-blocks
       (sort (send nmbs get-detection-block-ids) id<?))

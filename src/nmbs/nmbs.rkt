@@ -3,10 +3,8 @@
 (require racket/class
          racket/list
          racket/set
-         "../railway.rkt"
-         "../setup.rkt"
-         "../adts.rkt"
-         "../priority-queue.rkt")
+         "../railway/railway.rkt"
+         "../setup.rkt")
 
 (provide nmbs%)
 
@@ -69,8 +67,6 @@
 
     (define (get-loco id)
       (send railway get-loco id))
-    (define/public (get-loco-detection-block id)
-      (send infrabel get-loco-detection-block id))
     (define/public (get-loco-speed id)
       (abs (send infrabel get-loco-speed id)))
     (define/public (set-loco-speed id speed)
@@ -90,14 +86,27 @@
         (send railway add-loco id (get-track prev-id) (get-track curr-id))
         id))
 
+    (define/public (remove-loco loco-id)
+      (send infrabel remove-loco loco-id)
+      (send railway remove-loco loco-id))
+
     (define/public (route loco-id end-id)
       (define end (get-track end-id))
       (define loco (send railway get-loco loco-id))
       (define loco-current-track (send loco get-current-track))
       (define loco-previous-track (send loco get-previous-track))
-      (define route (make-object route% railway loco end))
-      (define route-ids (for/list ((r (in-list (send route get-route))))
-                          (send r get-id)))
+      (define route (let* ((route (make-object route% railway loco end))
+                           (route-ids (for/list ((r (in-list (send route get-route))))
+                                        (send r get-id))))
+                      (let loop ()
+                        (let ((all-clear-or-alt (send infrabel reserve-route loco-id route-ids)))
+                          (case all-clear-or-alt
+                            ((#t) (send route go))
+                            ((#f) (sleep 5)
+                                  (loop))
+                            (else (send route set-route
+                                        (for/list ((id (in-list all-clear-or-alt)))
+                                          (get-track id)))))))))
       (define direction (send loco get-direction))
       (when (eq? (send (send route peek-next) get-segment)
                  (send loco-previous-track get-segment))
@@ -128,7 +137,7 @@
                         (set! last-update (current-milliseconds))
                         (/ (- last-update old-update) 1000.0)))
         (let ((curr (send loco get-current-track))
-              (db? (get-loco-detection-block loco-id)))
+              (db? (send infrabel get-loco-detection-block loco-id)))
           (if db?
             ; if loco is on db
             (let ((db (get-track db?)))
@@ -136,7 +145,8 @@
                 ((eq? db end)
                  (sleep (/ (send end get-length) 3 speed))
                  (set-loco-speed loco-id 0)
-                 (send loco update-location db))
+                 (send loco update-location db)
+                 (send infrabel finished-route loco-id))
                 ; loco on same db as before
                 ((eq? db curr)
                  (route-iter (+ travelled (* delta speed))))
@@ -148,7 +158,6 @@
                  (send loco update-location (send route next))
                  (route-iter 0))
                 (else
-                  (displayln (format "shouldn't be on ~a" db))
                  (route-iter (+ travelled (* delta speed))))))
             (cond ((detection-block? curr)
                    ; last iteration, loco was on a db, but no longer
@@ -197,26 +206,14 @@
     (define/public (get-starting-spots)
       (hash-keys starting-spots))
 
-
-    (define detection-block-statuses #f)
-    (define (detection-block-statuses!)
-      (set! detection-block-statuses
-        (make-hash (map (lambda (x) (cons x 'green))
-                        (get-detection-block-ids)))))
-
     (define (get-updates)
-      (for ((loco (in-list (send railway get-loco-ids))))
-        (get-loco-detection-block loco))
-      (for ((db (send infrabel get-detection-block-statuses))
-            #:unless (eq? (cdr db)
-                          (hash-ref detection-block-statuses (car db))))
-        (hash-set! detection-block-statuses (car db) (cdr db))
+      (for ((db (send infrabel get-detection-block-statuses)))
         (for ((notify (in-list detection-block-listeners)))
           (notify (car db) (cdr db))))
       (for ((loco (in-list (get-loco-ids))))
         (for ((notify (in-list (hash-ref loco-speed-listeners loco))))
           (notify (get-loco-speed loco))))
-      (sleep 0.5)
+      (sleep 1)
       (get-updates))
 
     (define/public (initialize setup)
@@ -234,7 +231,6 @@
                                 (fn id pos))
                               (get-switch-listeners))
                     (send infrabel set-switch-position id pos))))))
-      (detection-block-statuses!)
       (find-starting-spots!)
       (thread (lambda ()
                 (sleep 0.5)
@@ -257,6 +253,15 @@
 
     (define/public (get-route)
       route)
+
+    (define/public (set-route new-route)
+      (set! route new-route)
+      (set-switches)
+      this)
+
+    (define/public (go)
+      (set-switches)
+      this)
 
     (define/public (current)
       (car route))
@@ -288,6 +293,4 @@
           #f
           (let ((segment-1 (send (car route) get-segment))
                 (segment-2 (send (caddr route) get-segment)))
-            (eq? segment-1 segment-2))))
-
-      (set-switches)))
+            (eq? segment-1 segment-2))))))

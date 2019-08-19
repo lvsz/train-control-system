@@ -6,7 +6,7 @@
          "adts.rkt"
          "priority-queue.rkt")
 
-(provide railway%)
+(provide railway% track? switch? detection-block? same-segment?)
 
 (define railway%
   (class object%
@@ -63,6 +63,9 @@
         new-loco))
     (public (public-add-loco add-loco))
 
+    (define/public (remove-loco id)
+      (hash-remove! locos id))
+
     (define (add-node id)
       (hash-set! nodes id (make-object node% id)))
     (define (get-or-add-node id)
@@ -117,6 +120,12 @@
       (filter (lambda (t) (not (is-a? t switch%))) (get-tracks)))
     (define routes&distances (make-hash))
 
+    ;; this function's main purpose is to make sure that if a train has to
+    ;: make a reverse maneuver after a switch on another switch, that the
+    ;: second switch is to be set on its longer track for its maneuver
+    ;; instead of of the default shortest track given by the pathfinder
+    ;; this makes it less likely for the train to overshoot it trajectory
+    ;; during the maneuver without affecting actual distance
     (define (improve-route route)
       (define improved-route '())
       (let loop ((route route))
@@ -126,7 +135,6 @@
                 (t2 (cadr route))
                 (t3 (caddr route)))
             (if (and (same-segment? t1 t3)
-                     (< (send t2 get-length) 250)
                      (switch? (send t2 get-segment)))
               (let ((better-t2 (remq t2 (send (send t2 get-segment) get-positions))))
                 (set! improved-route (cons t1 improved-route))

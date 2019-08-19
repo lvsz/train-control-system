@@ -322,7 +322,7 @@
     (field (speed 0)
            (direction 1))
     (super-new)
-    ;(displayln (cons (send previous-segment get-id) (send starting-segment get-id)))
+
     (define/public (get-id)
       id)
     (define/public (get-current-track)
@@ -332,13 +332,6 @@
     (define/public (update-location new-current-track (new-previous-track current-track))
       (set! current-track new-current-track)
       (set! previous-track new-previous-track))
-
-    ;(define/public (set-location new-location)
-      ;(when (is-a? location detection-block%)
-        ;(send location set-status 'green))
-      ;(when (is-a? new-location detection-block%)
-        ;(send new-location set-status 'red))
-      ;(set! location new-location))
     (define/public (get-speed)
       speed)
     (define/public (set-speed x)

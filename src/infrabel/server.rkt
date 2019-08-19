@@ -87,6 +87,8 @@
          (reply (send infrabel get-detection-block-statuses)))
         ((reserve-route)
          (reply (send/apply infrabel reserve-route args)))
+        ((finished-route)
+         (send/apply infrabel finished-route args))
         ((stop)
          (stop 'request))
         (else (displayln (cons 'unrecongized msg))))

@@ -2,8 +2,7 @@
 
 (require racket/class
          racket/list
-         "../railway.rkt"
-         "../adts.rkt"
+         "../railway/railway.rkt"
          "../setup.rkt"
          (prefix-in z21: "../interface/interface.rkt")
          (prefix-in sim: "../gui_simulator/interface.rkt"))
@@ -15,7 +14,6 @@
     (super-new)
 
     (define railway #f)
-    (define detection-blocks #f)
     (define locos (make-hash))
     (define segment-reservations (make-hash))
 
@@ -27,6 +25,9 @@
     (define ext:set-switch-position! sim:set-switch-position!)
     (define ext:get-switch-position sim:get-switch-position)
     (define ext:add-loco sim:add-loco)
+    (define ext:remove-loco sim:remove-loco)
+    (define ext:get-detection-block-ids sim:get-detection-block-ids)
+    (define ext:get-switch-ids sim:get-switch-ids)
 
     (define (z21-mode)
       (set! ext:start-simulator z21:start-simulator)
@@ -36,22 +37,22 @@
       (set! ext:get-loco-speed z21:get-loco-speed)
       (set! ext:set-loco-speed! z21:set-loco-speed!)
       (set! ext:get-loco-detection-block z21:get-loco-detection-block)
-      (set! ext:add-loco z21:add-loco))
+      (set! ext:add-loco z21:add-loco)
+      (set! ext:remove-loco void)
+      (set! ext:get-switch-ids (send railway get-switch-ids))
+      (set! ext:get-detection-block-ids (send railway get-detection-block-ids)))
 
     (define/public (initialize setup-id)
+      (set! railway (make-object railway% (get-setup setup-id)))
       (if (eq? setup-id 'real-hardware)
         (z21-mode)
-        (case (begin (displayln setup-id) setup-id)
+        (case setup-id
           ((hardware)             (sim:setup-hardware))
           ((straight)             (sim:setup-straight))
           ((straight-with-switch) (sim:setup-straight-with-switch))
           ((loop)                 (sim:setup-loop))
           ((loop-and-switches)    (sim:setup-loop-and-switches))
           (else                   (error (format "Setup ~a not found" setup-id)))))
-      (set! railway (make-object railway% (get-setup setup-id)))
-      (set! detection-blocks
-            (for/hash ((db (in-list (send railway get-detection-blocks))))
-              (values (send db get-id) db)))
       (for ((segment-id (in-list (send railway get-segment-ids))))
         (hash-set! segment-reservations segment-id #f))
       (ext:start-simulator)
@@ -62,18 +63,19 @@
         (send switch set-position (ext:get-switch-position (send switch get-id))))
       (for ((loco (in-list (send railway get-loco-ids))))
         (hash-set! locos loco #f)
-        (get-loco-detection-block loco))
-      'started)
+        (get-loco-detection-block loco)))
     (define/public (stop)
       (ext:stop-simulator))
       ;(sim:stop))
 
     (define loco-updates (make-hash))
+
     (define/public (add-loco id prev-segment-id curr-segment-id)
       (define prev-segment (get-track prev-segment-id))
       (define curr-segment (get-track curr-segment-id))
       (ext:add-loco id prev-segment-id curr-segment-id)
       (hash-set! locos id curr-segment-id)
+      (hash-set! segment-reservations curr-segment-id id)
       (send railway add-loco id prev-segment curr-segment)
       (hash-set! loco-updates (send railway get-loco id)
                  (update (current-milliseconds)
@@ -84,8 +86,14 @@
                          #f))
       (send curr-segment occupy))
     (define/public (remove-loco id)
-      (void))
-      ;(sim:remove-loco id))
+      (ext:remove-loco id)
+      (send railway remove-loco id)
+      (hash-remove! locos id)
+      (for (((segment loco) (in-hash segment-reservations))
+            #:when (eq? id loco))
+        (hash-set! segment-reservations segment #f)
+        (when (detection-block? (get-track segment))
+          (send (get-track segment) clear))))
     (define/public (get-loco-speed id)
       (ext:get-loco-speed id))
     (define/public (set-loco-speed id speed)
@@ -93,28 +101,30 @@
       (ext:set-loco-speed! id speed))
     (define/public (change-loco-direction id)
       (set-loco-speed id (- (ext:get-loco-speed id))))
+
     (define/public (get-loco-detection-block id)
-      (let (;(sim-db (sim:get-loco-detection-block id))
-            (sim-db (ext:get-loco-detection-block id))
+      (let ((sim-db (ext:get-loco-detection-block id))
             (loco-db (hash-ref locos id)))
         (cond
           ; nothing changed
-          (#f ;(eq? sim-db loco-db)
+          ((eq? sim-db loco-db)
            (void))
           ; loco is on a detection block but wasn't before
           ((and sim-db (not loco-db))
-           (send (hash-ref detection-blocks sim-db) occupy)
+           (send (send railway get-detection-block sim-db) occupy)
+           (hash-set! locos id sim-db)
+           (hash-set! segment-reservations sim-db id))
            ;(send (get-loco id) update-location (get-track sim-db))
-           (hash-set! locos id sim-db))
           ; loco is on a new detection block
           ((and sim-db loco-db)
-           (send (hash-ref detection-blocks loco-db) clear)
-           (send (hash-ref detection-blocks sim-db) occupy)
+           (send (send railway get-detection-block loco-db) clear)
+           (send (send railway get-detection-block sim-db) occupy)
            ;(send (get-loco id) update-location (get-track sim-db))
-           (hash-set! locos id sim-db))
+           (hash-set! locos id sim-db)
+           (hash-set! segment-reservations sim-db id))
           ; else loco left a detection block
           (else
-           (send (hash-ref detection-blocks loco-db) clear)
+           (send (send railway get-detection-block loco-db) clear)
            (hash-set! locos id #f)))
         sim-db))
 
@@ -124,35 +134,36 @@
     (define (get-track id)
       (send railway get-track id))
 
-    (define (get-detection-blocks)
-      (send railway get-detection-blocks))
-
     (define/public (reserve-route loco-id route)
       (define segments
         (for/list ((track-id (in-list route)))
           (send (get-track track-id) get-segment-id)))
-
       (define non-clear
         (for/list ((segment-id (in-list segments))
                    #:when (let ((reserved (hash-ref segment-reservations segment-id)))
                             (and reserved
                                 (not (eq? reserved loco-id)))))
           segment-id))
-
       (define (alt-route)
         (send railway get-alt-route
               (get-track (first route))
               (get-track (last route))
               (map get-track non-clear)))
+      (if (empty? non-clear)
+        (begin (for ((segment-id (in-list segments)))
+                 (hash-set! segment-reservations segment-id loco-id))
+               #t)
+        (let ((alt (alt-route)))
+          (if alt
+            (map (lambda (x) (send x get-id)) alt)
+            #f))))
 
-      (cond ((empty? non-clear)
-             (for ((segment-id (in-list segments)))
-               (hash-set! segment-reservations segment-id loco-id))
-             'all-clear)
-            (else (let ((alt (alt-route)))
-                    (if alt
-                      (map (lambda (x) (send x get-id)) alt)
-                      #f)))))
+    (define/public (finished-route loco-id)
+      (let ((current-db (get-loco-detection-block loco-id)))
+        (for (((segment-id loco?) (in-hash segment-reservations))
+              #:when (and (eq? loco-id loco?)
+                          (not (eq? segment-id current-db))))
+          (hash-set! segment-reservations segment-id #f))))
 
     (struct update (time location next-segment speed travelled route) #:transparent)
     (define (loco-tracker)
@@ -262,16 +273,13 @@
       (send (get-track id) set-position position)
       (ext:set-switch-position! id position))
     (define/public (get-switch-ids)
-      (displayln (send railway get-switch-ids))
-      (send railway get-switch-ids))
-      ;(ext:get-switch-ids))
+      (ext:get-switch-ids))
 
     (define/public (get-detection-block-ids)
-      (displayln (send railway get-detection-block-ids))
-      (send railway get-detection-block-ids))
-      ;(ext:get-detection-block-ids))
+      (ext:get-detection-block-ids))
+
     (define/public (get-detection-block-statuses)
-      (for/list ((db (in-list (hash-values detection-blocks))))
+      (for/list ((db (in-list (send railway get-detection-blocks))))
         (cons (send db get-id) (send db get-status))))
 
     (define (lock-loco . args)
@@ -306,7 +314,7 @@
               (append conflict avoid)))
       (define (nearest-db from avoid)
         (let ((best (cons #f +inf.0)))
-          (for ((db (in-list (get-detection-blocks)))
+          (for ((db (in-list (send railway get-detection-blocks)))
                 #:when (and (not (memq db avoid))
                             (eq? (send db get-status 'green))))
             (let-values (((route dist)
