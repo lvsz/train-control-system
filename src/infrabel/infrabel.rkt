@@ -9,12 +9,19 @@
 
 (provide infrabel%)
 
+;; methods
+; initialize
+; start
+; add-loco
+; remove-loco
+; get-loco-speed
+; set-loco-speed
+; change-loco-direction
 (define infrabel%
   (class object%
     (super-new)
 
     (define railway #f)
-    (define locos (make-hash))
     (define segment-reservations (make-hash))
 
     (define ext:start-simulator sim:start)
@@ -62,7 +69,6 @@
       (for ((switch (in-list (send railway get-switches))))
         (send switch set-position (ext:get-switch-position (send switch get-id))))
       (for ((loco (in-list (send railway get-loco-ids))))
-        (hash-set! locos loco #f)
         (get-loco-detection-block loco)))
     (define/public (stop)
       (ext:stop-simulator))
@@ -75,7 +81,6 @@
       (define curr-segment (get-track curr-segment-id))
       (ext:add-loco id prev-segment-id curr-segment-id)
       (send railway add-loco id prev-segment-id curr-segment-id)
-      (hash-set! locos id curr-segment-id)
       (hash-set! segment-reservations curr-segment-id id)
       (hash-set! loco-updates
                  (send railway get-loco id)
@@ -86,48 +91,51 @@
                          0
                          #f))
       (send curr-segment occupy))
+
     (define/public (remove-loco id)
       (ext:remove-loco id)
       (send railway remove-loco id)
-      (hash-remove! locos id)
       (for (((segment loco) (in-hash segment-reservations))
             #:when (eq? id loco))
         (hash-set! segment-reservations segment #f)
         (when (detection-block? (get-track segment))
           (send (get-track segment) clear))))
+
     (define/public (get-loco-speed id)
       (ext:get-loco-speed id))
+
     (define/public (set-loco-speed id speed)
       (send (get-loco id) set-speed speed)
       (ext:set-loco-speed! id speed))
+
     (define/public (change-loco-direction id)
       (set-loco-speed id (- (ext:get-loco-speed id))))
 
-    (define/public (get-loco-detection-block id)
-      (let ((sim-db (ext:get-loco-detection-block id))
-            (loco-db (hash-ref locos id)))
+    (define/public (get-loco-detection-block loco-id)
+      (let* ((new-db-id (ext:get-loco-detection-block loco-id))
+             (new-db (and new-db-id (get-track new-db-id)))
+             (loco (send railway get-loco loco-id))
+             (old-db (send loco detection-block)))
         (cond
           ; nothing changed
-          ((eq? sim-db loco-db)
+          ((eq? new-db old-db)
            (void))
           ; loco is on a detection block but wasn't before
-          ((and sim-db (not loco-db))
-           (send (send railway get-detection-block sim-db) occupy)
-           (hash-set! locos id sim-db)
-           (hash-set! segment-reservations sim-db id))
-           ;(send (get-loco id) update-location (get-track sim-db))
+          ((and new-db (not old-db))
+           (send new-db occupy)
+           (send loco update-location new-db)
+           (hash-set! segment-reservations new-db-id loco-id))
           ; loco is on a new detection block
-          ((and sim-db loco-db)
-           (send (send railway get-detection-block loco-db) clear)
-           (send (send railway get-detection-block sim-db) occupy)
-           ;(send (get-loco id) update-location (get-track sim-db))
-           (hash-set! locos id sim-db)
-           (hash-set! segment-reservations sim-db id))
+          ((and new-db old-db)
+           (send old-db clear)
+           (send new-db occupy)
+           (send loco update-location new-db)
+           (hash-set! segment-reservations new-db-id loco-id))
           ; else loco left a detection block
           (else
-           (send (send railway get-detection-block loco-db) clear)
-           (hash-set! locos id #f)))
-        sim-db))
+           (send old-db clear)
+           (send loco left-detection-block)))
+        new-db))
 
     (define (get-loco id)
       (send railway get-loco id))
@@ -263,7 +271,7 @@
 
     (thread (lambda ()
               (let loop ()
-                (for ((loco (in-list (hash-keys locos))))
+                (for ((loco (in-list (send railway get-loco-ids))))
                   (get-loco-detection-block loco))
                 (sleep 0.5)
                 (loop))))

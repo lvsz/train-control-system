@@ -327,18 +327,34 @@
       id)
     (define/public (get-current-track)
       current-track)
+
     (define/public (get-previous-track)
       previous-track)
+
+    (define on-detection-block? #f)
+
     (define/public (update-location new-current-track (new-previous-track current-track))
+      (set! on-detection-block? (detection-block? new-current-track))
       (set! current-track new-current-track)
       (set! previous-track new-previous-track))
+
     (define/public (get-speed)
       speed)
+
     (define/public (set-speed x)
       (set! speed x))
 
+    (define/public (detection-block)
+      (if on-detection-block?
+        current-track
+        #f))
+
+    (define/public (left-detection-block)
+      (set! on-detection-block? #f))
+
     (define/public (get-direction)
       direction)
+
     (define/public (change-direction)
       (set! direction (- direction)))))
 
