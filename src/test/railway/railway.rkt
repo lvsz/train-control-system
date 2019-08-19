@@ -51,7 +51,7 @@
   (test-suite
     "Check interdependency of components"
     (check-equal? (set d-1-4 s-20)
-                  (list->set (send d-1-5 get-connected-tracks)))
+                  (list->set (send d-1-5 get-connected-segments)))
     (send d-1-5 occupy)
     (check-eq? (send d-1-4 get-status)
                'orange

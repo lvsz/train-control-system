@@ -217,7 +217,7 @@
             tracks)
   (reschedule! pq (pq-id-of start) 0 notify)
   (let-values (((from distance) (serve! pq notify)))
-    (for ((to (in-list (send start get-connected-tracks*)))
+    (for ((to (in-list (send start get-connected-tracks)))
           #:unless (memq to avoid))
       (relax! from to)))
   (let loop ()

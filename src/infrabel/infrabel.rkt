@@ -186,7 +186,7 @@
       (define (next-from track from)
         (if from
           (send track from from)
-          (let ((connected (send track get-connected-tracks)))
+          (let ((connected (send track get-connected-segments)))
             (car connected))))
       (for (((loco last-update) (in-hash loco-updates)))
         (printf "loco on ~a?~%~%" (update-location last-update))

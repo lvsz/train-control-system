@@ -244,11 +244,10 @@
                   ; first make sure there's a match
                   (and (memq track-id infrabel-ids)
                        (let* ((track (send railway get-track track-id))
-                              ; get ids from tracks connected to current track
-                              (ids (map (lambda (t)
-                                          (send t get-id))
-                                        (send track get-connected-tracks)))
-                              ; check if any connected track can be found in infrabel
+                              ; get ids from segments connected to current track
+                              (ids (map (lambda (s) (send s get-id))
+                                        (send track get-connected-segments)))
+                              ; check if any connected segment can be found in infrabel
                               (prev (findf (lambda (x)
                                              (memq x infrabel-ids))
                                            ids)))

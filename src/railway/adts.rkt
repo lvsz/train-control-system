@@ -38,6 +38,7 @@
   (eq? (send a get-segment)
        (send b get-segment)))
 
+;; unexported convenience function for removing duplicate elements
 (define (nub lst)
   (set->list (list->set lst)))
 
@@ -66,20 +67,20 @@
     ; only used by track%
     (define/public (from track)
       (cond ((and (not (memq track tracks)))
-             (let ((switch (get-field master-switch track)))
+             (let ((switch (get-field super-switch track)))
                (if switch
                  (from switch)
                  (error (format "node ~a does not connect to track ~a" id (send track get-id))))))
             ((and (pair? tracks) (pair? (cdr tracks)))
              (car (remq track tracks)))
-            (else #f)))
+            (else #f)))))
 
-    ))
-
+;; in its most basic form, a track is two nodes & the distance in between
+;; this is however also the superclass for detection blocks & switches
 (define track%
   (class* object% (writable<%>)
     (init-field id node-1 node-2 length)
-    (field (master-switch #f) (segment this))
+    (field (super-switch #f) (segment this))
     (super-new)
     (send node-1 add-track this)
     (send node-2 add-track this)
@@ -96,23 +97,23 @@
     (define/public (get-segment-id)
       (send segment get-id))
 
-    (define/public (get-nodes)
-      (values node-1 node-2))
-
     (define/public (get-current-track)
       this)
 
+    ;; coming from one track, what is the next segment?
     (define/public (from track)
       (let ((segment (send track get-segment))
-            (connected (get-connected-tracks)))
+            (connected (get-connected-segments)))
         (if (or (null? connected)
                 (null? (cdr connected))
                 (not (memq segment connected)))
           #f
           (car (remq segment connected)))))
 
+    ;; expanded form of from, that returns tracks instead of segments
+    ;; can also return option when reversing on this track into a switch
     (define/public (from* track (include-rev #t))
-      (let (; options going forwards
+      (let (; option going forwards
             (fwd (from track))
             ; options when reversing on this track
             (rev (if (and include-rev
@@ -121,43 +122,42 @@
                            (remq track (send (send track get-segment)
                                              get-positions)))
                    '())))
-        (cond ((not fwd)
+        (cond ((not fwd) ; no options going forward (dead end)
                rev)
-              ((is-a? fwd switch%)
+              ((is-a? fwd switch%) ; if next one's a switch, get its options
                (append (filter (lambda (p) (connected? this p))
                               (send fwd get-positions))
                       rev))
               (else
                (cons fwd rev)))))
 
-    (define/public (get-connected-tracks)
+    (define/public (get-connected-segments)
       (filter identity
               (map (lambda (n)
                      (send n from this))
                    (list node-1 node-2))))
 
-    (define/public (get-connected-tracks*)
+    (define/public (get-connected-tracks)
       (flatten (map (lambda (t)
                       (if (is-a? t switch%)
                         (filter (lambda (p) (connected? this p))
                                 (send t get-positions))
                         t))
-                    (get-connected-tracks))))
+                    (get-connected-segments))))
 
-    (define/public (get-master-switch)
-      master-switch)
+    (define/public (get-super-switch)
+      super-switch)
 
+    ;; called when this track becomes part of a switch segment
     (define/public (switch-override switch)
-      (send node-1 remove-track (or master-switch this))
+      (send node-1 remove-track (or super-switch this))
       (send node-1 add-track switch)
-      (send node-2 remove-track (or master-switch this))
+      (send node-2 remove-track (or super-switch this))
       (send node-2 add-track switch)
-      (set! master-switch switch)
+      (set! super-switch switch)
       (set! segment switch))
 
-    (define/public (same-segment? track)
-      (eq? segment (send track get-segment)))
-
+    ;; custom printing functions to make debugging easier
     (define/public (custom-write port)
       (write (cons 'track% id) port))
     (define/public (custom-display port)
@@ -176,7 +176,7 @@
     (define connected-blocks
       (for/list ((track (in-list (list (send node-1 from this)
                                        (send node-2 from this))))
-                 #:when (is-a? track detection-block%))
+                 #:when (detection-block? track))
         (send track connect-block this)
         track))
 
@@ -212,7 +212,7 @@
   (class track%
     (init ((_id id)))
     (init-field position-1 position-2)
-    (inherit-field master-switch segment)
+    (inherit-field super-switch segment)
     (super-make-object _id
                        (get-field node-1 position-1)
                        (get-field node-2 position-1)
@@ -223,22 +223,24 @@
     (send position-2 switch-override this)
 
     (define/override (switch-override switch)
-      (set! master-switch switch)
+      (set! super-switch switch)
       (set! segment switch)
       (send position-1 switch-override switch)
       (send position-2 switch-override switch)
       (cond ((eq? (get-field position-1 switch) this)
-             (set! adjust-master-switch
+             (set! adjust-super-switch
                (lambda () (send switch set-position 1))))
              ((eq? (get-field position-2 switch) this)
-              (set! adjust-master-switch
+              (set! adjust-super-switch
                 (lambda () (send switch set-position 2))))))
 
     (define position 1)
 
+    ;; only returns the next segment depending on current position
     (define/override (from track)
       (send (current) from track))
 
+    ;; returns all possible options from either positions
     (define/override (from* track (include-rev #t))
       (flatten (list (send position-1 from* track include-rev)
                      (send position-2 from* track include-rev))))
@@ -246,14 +248,11 @@
     (define/override (get-length)
       (send (current) get-length))
 
-    (define/override (get-nodes)
-      (send (current) get-nodes))
+    (define/override (get-connected-segments)
+      (nub (append (send position-1 get-connected-segments)
+                   (send position-2 get-connected-segments))))
 
-    (define/override (get-connected-tracks)
-      (nub (append (send position-1 get-connected-tracks)
-                   (send position-2 get-connected-tracks))))
-
-    (define/public (get-positions (from #f))
+    (define/public (get-positions)
       (flatten (list (if (switch? position-1)
                        (send position-1 get-positions)
                        position-1)
@@ -261,23 +260,26 @@
                        (send position-2 get-positions)
                        position-2))))
 
+    ;; checks whether this switch has a track or any of its subswitches
     (define/public (has? track)
       (or (eq? position-1 track)
           (eq? position-2 track)
-          (and (is-a? position-1 switch%) (send position-1 has? track))
-          (and (is-a? position-2 switch%) (send position-2 has? track))))
+          (and (switch? position-1) (send position-1 has? track))
+          (and (switch? position-2) (send position-2 has? track))))
 
     (define/public (get-position)
       position)
 
-    (define adjust-master-switch void)
+    (define adjust-super-switch void)
 
+    ;; switches can get changed by a variety of sources
+    ;; a callback will be called whenever this happens
     (define callback void)
     (define/public (set-callback f)
       (set! callback f))
 
     (define/public (set-position int)
-      (adjust-master-switch)
+      (adjust-super-switch)
       (set! position int)
       (callback))
 
