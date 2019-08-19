@@ -1,10 +1,12 @@
 #lang racket/base
 
+(provide run)
+
 (require racket/class
          racket/set
          rackunit
          rackunit/text-ui
-         "../adts.rkt")
+         "../../railway/adts.rkt")
 
 (define n1 (make-object node% 'n1))
 (define n2 (make-object node% 'n2))
@@ -186,8 +188,9 @@
 
 
 
-(for-each run-tests (list node-tests
-                          track-tests
-                          block-tests
-                          switch-tests))
+(define (run)
+  (run-tests node-tests)
+  (run-tests track-tests)
+  (run-tests block-tests)
+  (run-tests switch-tests))
 
