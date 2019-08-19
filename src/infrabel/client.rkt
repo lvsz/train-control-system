@@ -7,6 +7,7 @@
          racket/class
          "../logger.rkt")
 
+;; read tcp port & host from file
 (define-values (port host)
   (call-with-input-file
     "resources/tcp.txt"
@@ -14,9 +15,11 @@
       (values (string->number (read-line file))
               (read-line file)))))
 
+;; tcp input & output
 (define-values (in out)
   (values #f #f))
 
+;; try connecting to server 10 times before failing
 (define max-attempts 10)
 (define (try-connect (n 1))
   (when (>= n max-attempts)
@@ -27,13 +30,14 @@
                         (eprintf "tcp-connect attempt ~a failed~%" n)
                         (sleep 0.5)
                         (try-connect (add1 n)))))
+                 ; connection succesful, update i/o ports
                  (let-values (((i o) (tcp-connect host port)))
                    (set! in i)
                    (set! out o))))
 
-;; Struct for sending a request over tcp
+;; struct for sending a request over tcp
 ;; msg contains the request
-;; on-response is either #f or unary function
+;; on-response is either #f or a function that takes the response as argument
 (struct request (msg on-response))
 
 ;; Several threads may be sending & requesting data over tcp,
@@ -72,11 +76,17 @@
       (begin (sleep 0.05)
              (wait))))))
 
+;; logging function that can be enabled
+(define log void)
+
 ;; for interchangeability purposes, this has the exact same interface
 ;; as the infrabel% class in infrabel.rkt
 (define infrabel%
   (class object%
+    (init-field (log? #t))
     (super-new)
+
+    (when log? (set! log (make-logger "infrabel-interface.log")))
 
     (define/public (initialize setup-id)
       (try-connect)
@@ -117,6 +127,4 @@
       (get 'reserve-route loco-id route))
     (define/public (finished-route loco-id)
       (put 'finished-route loco-id))))
-
-(define log (make-logger "infrabel-interface.log"))
 

@@ -9,10 +9,10 @@
          (prefix-in local: "../../infrabel/infrabel.rkt")
          (prefix-in tcp: "../../infrabel/client.rkt"))
 
-(thread (lambda () (start-server #f)))
+(void (thread (lambda () (start-server #f))))
 
 (define infrabel (new local:infrabel%))
-(define client (new tcp:infrabel%))
+(define client (new tcp:infrabel% (log? #f)))
 
 (define tcp-tests
   (test-suite

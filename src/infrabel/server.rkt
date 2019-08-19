@@ -90,7 +90,7 @@
          (send/apply infrabel finished-route args))
         ((stop)
          (stop 'request))
-        (else (displayln (cons 'unrecongized msg))))
+        (else (log (format "Unrecongized message: ~a" msg))))
       (loop (get-msg)))))
 
 
