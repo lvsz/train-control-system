@@ -194,6 +194,10 @@
       (sleep 1)
       (get-updates))
 
+    (define/public (stop)
+      (send infrabel stop)
+      (kill-thread (current-thread)))
+
     (define/public (initialize setup)
       (set! railway (make-object railway% setup))
       (send infrabel initialize (send setup get-id))

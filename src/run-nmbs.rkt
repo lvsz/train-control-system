@@ -10,7 +10,6 @@
 (provide main)
 
 (define (main (setup-id #f) (remote #t))
-
   (let loop ((args (vector->list (current-command-line-arguments))))
     (unless (null? args)
       (case (car args)
@@ -24,14 +23,11 @@
          (eprintf "Unrecognized argument: " (car args))
          (loop (cdr args))))))
 
-  ;; define infrabel
+  ;; define infrabel, locally or over TCP
   (define infrabel
     (if remote
       (new tcp:infrabel%)
       (new local:infrabel%)))
-
-  ;; start infrabel
-  ;;(send infrabel start)
 
   ;; define nmbs
   (define nmbs
@@ -39,16 +35,18 @@
          (infrabel infrabel)))
 
   ;; create window & run application
-  (void (cond (setup-id
-                (send nmbs initialize (get-setup setup-id))
-                (new window% (nmbs nmbs)
-                     (atexit (lambda () (send infrabel stop)))))
-              (else
-                (new setup-window%
-                     (setups setups)
-                     (callback (lambda (setup)
-                                 (send nmbs initialize setup)
-                                 (new window% (nmbs nmbs)
-                                      (atexit (lambda () (send infrabel stop)))))))))))
+  (void
+    (cond
+      (setup-id
+        (send nmbs initialize (get-setup setup-id))
+        (new window% (nmbs nmbs)
+             (atexit (lambda () (send nmbs stop)))))
+      (else
+        (new setup-window%
+             (setups setups)
+             (callback (lambda (setup)
+                         (send nmbs initialize setup)
+                         (new window% (nmbs nmbs)
+                              (atexit (lambda () (send nmbs stop)))))))))))
 
 (main)
