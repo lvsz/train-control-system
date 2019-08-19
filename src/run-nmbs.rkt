@@ -4,7 +4,7 @@
          "nmbs/nmbs.rkt"
          "gui.rkt"
          "setup.rkt"
-         (prefix-in tcp: "infrabel/interface.rkt")
+         (prefix-in tcp: "infrabel/client.rkt")
          (prefix-in local: "infrabel/infrabel.rkt"))
 
 (provide main)
