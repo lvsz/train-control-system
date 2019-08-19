@@ -7,10 +7,12 @@
          racket/class
          "../logger.rkt")
 
-(define port (call-with-input-file "resources/tcp-port.txt" read))
-
-(unless (directory-exists? "logs") (make-directory "logs"))
-(define log-file (open-output-file "logs/infrabel-interface.log" #:exists 'append))
+(define-values (port host)
+  (call-with-input-file
+    "resources/tcp.txt"
+    (lambda (file)
+      (values (string->number (read-line file))
+              (read-line file)))))
 
 (define-values (in out)
   (values #f #f))
@@ -25,7 +27,7 @@
                         (eprintf "tcp-connect attempt ~a failed~%" n)
                         (sleep 0.5)
                         (try-connect (add1 n)))))
-                 (let-values (((i o) (tcp-connect "localhost" port)))
+                 (let-values (((i o) (tcp-connect host port)))
                    (set! in i)
                    (set! out o))))
 

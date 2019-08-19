@@ -10,7 +10,7 @@
 
 (define infrabel (new infrabel%))
 
-(define port (call-with-input-file "resources/tcp-port.txt" read))
+(define port (call-with-input-file "resources/tcp.txt" read))
 (define listener #f)
 (define in #f)
 (define out #f)

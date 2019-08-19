@@ -68,11 +68,15 @@
     (define/public (start)
       (for ((switch (in-list (send railway get-switches))))
         (send switch set-position (ext:get-switch-position (send switch get-id))))
-      (for ((loco (in-list (send railway get-loco-ids))))
-        (get-loco-detection-block loco)))
+      (thread (lambda ()
+                (let loop ()
+                  (for ((loco (in-list (send railway get-loco-ids))))
+                    (get-loco-detection-block loco))
+                  (sleep 1)
+                  (loop)))))
+
     (define/public (stop)
       (ext:stop-simulator))
-      ;(sim:stop))
 
     (define loco-updates (make-hash))
 
@@ -269,12 +273,6 @@
     ;(thread loco-tracker)
 
 
-    (thread (lambda ()
-              (let loop ()
-                (for ((loco (in-list (send railway get-loco-ids))))
-                  (get-loco-detection-block loco))
-                (sleep 0.5)
-                (loop))))
 
     (define/public (get-switch-position id)
       (ext:get-switch-position id))
