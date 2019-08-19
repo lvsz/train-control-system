@@ -74,10 +74,11 @@
       (define prev-segment (get-track prev-segment-id))
       (define curr-segment (get-track curr-segment-id))
       (ext:add-loco id prev-segment-id curr-segment-id)
+      (send railway add-loco id prev-segment-id curr-segment-id)
       (hash-set! locos id curr-segment-id)
       (hash-set! segment-reservations curr-segment-id id)
-      (send railway add-loco id prev-segment curr-segment)
-      (hash-set! loco-updates (send railway get-loco id)
+      (hash-set! loco-updates
+                 (send railway get-loco id)
                  (update (current-milliseconds)
                          curr-segment
                          (send curr-segment from prev-segment)
