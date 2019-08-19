@@ -22,7 +22,6 @@
     (set! out _out))
   (let loop ()
     (let ((msg (get-msg)))
-      (displayln msg)
       (case (car msg)
         ((initialize) (cadr msg))
         (else (loop))))))
@@ -95,11 +94,11 @@
       (loop (get-msg)))))
 
 
-(define log (make-logger "infrabel-server.log"))
+(define log void)
 
-(define (start-server)
+(define (start-server (log? #t))
+  (when log? (set! log (make-logger "infrabel-server.log")))
   (with-handlers ((exn:break? stop))
                  (send infrabel initialize (setup))
                  (begin0 (send infrabel start)
-                         (sleep 0.1)
                          (thread run))))
