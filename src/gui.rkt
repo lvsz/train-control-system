@@ -23,15 +23,6 @@
       (< a-nums b-nums)
       (symbol<? a b))))
 
-(define pick-setup-panel%
-  (class panel%
-    (init-field setups nmbs callback)
-    (super-new (enabled #t)
-               (min-height 50)
-               (alignment '(center top)))
-
-    ))
-
 ;; main panel for the user to control locomotives
 (define loco-panel%
   (class panel%
@@ -52,9 +43,12 @@
         #f
         (car locos)))
 
+    ;; list of track ids that a loco can be added on
     (define starting-spots
       (sort (send nmbs get-starting-spots) id<?))
 
+    ;; make a listener for the speed controller so it can get updated
+    ;; when the active loco's speed changes
     (define (mk-listener id)
       (lambda (speed)
         (when (eq? id active-loco)
@@ -85,7 +79,7 @@
                      (set! active-loco id)
                      (send choice set-selection 0))))))))
 
-    ; initialize selection menu
+    ;; initialize selection menu, listing all available locos
     (define loco-select-menu
       (new choice%
            (label "Active loco")
@@ -119,7 +113,6 @@
           (begin (set! active-loco #f)
                  (send loco-select-menu append "---"))
           (set! active-loco (list-ref locos (send loco-select-menu get-selection))))))
-
 
     (define loco-control
       (new vertical-pane%
@@ -156,24 +149,13 @@
                (when active-loco
                  (send nmbs change-loco-direction active-loco))))))
 
-    (define remove-button
-      (new button%
-           (label "Remove")
-           (parent loco-control)
-           (enabled #t)
-           (callback
-             (lambda (btn evt)
-               (when active-loco
-                 (send nmbs remove-loco active-loco)
-                 (remove-loco-from-menu!))))))
-
-    (define detection-blocks
+    (define destinations
       (sort (send nmbs get-detection-block-ids) id<?))
 
-    (define router
+    (define destination-picker
       (new choice%
-           (label "Router")
-           (choices (map symbol->string detection-blocks))
+           (label "Go to")
+           (choices (map symbol->string destinations))
            (parent loco-control)
            (vert-margin 0)
            (callback
@@ -184,7 +166,18 @@
                              (send nmbs
                                    route
                                    active-loco
-                                   (list-ref detection-blocks idx))))))))))))
+                                   (list-ref destinations idx))))))))))
+
+    (define remove-button
+      (new button%
+           (label "Remove")
+           (parent loco-control)
+           (enabled #t)
+           (callback
+             (lambda (btn evt)
+               (when active-loco
+                 (send nmbs remove-loco active-loco)
+                 (remove-loco-from-menu!))))))))
 
 
 ;; main panel to control the railway's switches
