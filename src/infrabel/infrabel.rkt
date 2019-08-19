@@ -139,7 +139,7 @@
           (else
            (send old-db clear)
            (send loco left-detection-block)))
-        new-db))
+        new-db-id))
 
     (define (get-loco id)
       (send railway get-loco id))
