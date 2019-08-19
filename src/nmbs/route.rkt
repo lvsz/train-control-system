@@ -30,28 +30,40 @@
 
     (define/public (peek-next)
       (if (null? (cdr route))
-        '()
+        #f
         (cadr route)))
+
+    (define prev #f)
 
     (define/public (next)
       (begin0 (peek-next)
               (unless (null? route)
                 (set-switches)
+                (set! prev (car route))
                 (set! route (cdr route)))))
 
     (define (set-switches)
       (let loop ((next (cdr route))
-                 (visited (list (send (car route) get-segment))))
+                 (visited (list (send (car route) get-segment)))
+                 (distance 0))
         (unless (null? next)
           (let ((segment (send (car next) get-segment)))
-            (when (and (switch? segment)
-                       (not (memq segment visited)))
-              (send segment set-current-track (car next))
-              (loop (cdr next) (cons segment visited)))))))
+            ; don't want to mess with all switches on our route
+            ; but don't want to stop early either
+            (unless (or (> distance 1500)
+                        (memq segment visited))
+              (when (and (switch? segment)
+                         (not (eq? (send segment get-current-track) (car next))))
+                (send segment set-current-track (car next)))
+              (loop (cdr next)
+                    (cons segment visited)
+                    (+ distance (send segment get-length))))))))
 
-      (define/public (reverse?)
-        (if (or (null? route) (null? (cdr route)) (null? (cddr route)))
-          #f
-          (let ((segment-1 (send (car route) get-segment))
-                (segment-2 (send (caddr route) get-segment)))
-            (eq? segment-1 segment-2))))))
+    (define/public (reverse?)
+      (and prev
+           (pair? route)
+           (peek-next)
+           (same-segment? prev (peek-next))))
+
+    (define/public (finished?)
+      (eq? (car route) to))))
