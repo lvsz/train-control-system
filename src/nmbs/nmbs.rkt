@@ -68,21 +68,22 @@
     (define/public (set-loco-speed id speed)
       (for ((notify (in-list (hash-ref loco-speed-listeners id))))
         (notify speed))
-      (send infrabel set-loco-speed id (* (send (get-loco id) get-direction) speed)))
+      (send infrabel set-loco-speed id
+            (* (send (get-loco id) get-direction) speed)))
     (define/public (change-loco-direction id)
       (send infrabel change-loco-direction id)
       (send (get-loco id) change-direction))
 
-    ;; nmbs uses a list of viable starting spot objects
-    ;; used to add new locomotives
+    ;; nmbs generates a list of viable starting spots
+    ;; to add new locomotives
     (define/public (add-loco spot-id)
       (let* ((spot (hash-ref starting-spots spot-id))
              (curr-id (starting-spot-current spot))
              (prev-id (starting-spot-previous spot))
-             (id (gensym "L")))
-        (send infrabel add-loco id prev-id curr-id)
-        (send railway add-loco id prev-id curr-id)
-        id))
+             (loco-id (gensym "L")))
+        (send infrabel add-loco loco-id prev-id curr-id)
+        (send railway add-loco loco-id prev-id curr-id)
+        loco-id))
 
     (define/public (remove-loco loco-id)
       (send infrabel remove-loco loco-id)
@@ -93,34 +94,41 @@
       (define loco (send railway get-loco loco-id))
       (define loco-current-track (send loco get-current-track))
       (define loco-previous-track (send loco get-previous-track))
-      (define route (let* ((route (make-object route% railway loco end))
-                           (route-ids (for/list ((r (in-list (send route get-route))))
-                                        (send r get-id))))
-                      (let loop ()
-                        (let ((all-clear-or-alt (send infrabel reserve-route loco-id route-ids)))
-                          (case all-clear-or-alt
-                            ((#t) (send route go))
-                            ((#f) (sleep 5)
-                                  (loop))
-                            (else (send route set-route
-                                        (for/list ((id (in-list all-clear-or-alt)))
-                                          (send railway get-track id)))))))))
-      (define direction (send loco get-direction))
-      (when (eq? (send (send route peek-next) get-segment)
-                 (send loco-previous-track get-segment))
-        (set! direction (- direction))
-        (change-loco-direction loco-id))
-      (define speed 40)
+      ;; create routes and check whether it's available
+      ;; otherwise get alternative route from infrabel or wait
+      (define route
+        (let* ((route (make-object route% railway loco end))
+               (route-ids (for/list ((r (in-list (send route get-route))))
+                            (send r get-id))))
+          (let loop ()
+            (let ((all-clear-or-alt (send infrabel reserve-route loco-id route-ids)))
+              (case all-clear-or-alt
+                ((#t) (send route go))
+                ((#f) (sleep 5)
+                      (loop))
+                (else (send route set-route
+                            (for/list ((id (in-list all-clear-or-alt)))
+                              (send railway get-track id)))))))))
+      ;; define direction, changing it if needed
+      (define direction
+        (let ((dir (send loco get-direction)))
+          (if (eq? (send (send route peek-next) get-segment)
+                   (send loco-previous-track get-segment))
+            (begin (change-loco-direction loco-id)
+                   (- dir))
+            dir)))
+      (define speed 70)
       (define interval 0.01)
+      ;; time needed when reversing after a switch
       (define clearance (/ 100 speed))
-      (set-loco-speed loco-id speed)
+      ;; listener function to update parameters after a speed change
       (define (loco-speed-changed new-speed)
         (set! speed new-speed)
         (unless (zero? speed)
           (set! clearance (/ 100 speed))))
-      (add-loco-speed-listener loco-id loco-speed-changed)
-      (define last-update (current-milliseconds))
+      (define last-update #f)
 
+      ;; called when route requires a reversing maneuver
       (define (reverse-loco)
         (sleep clearance)
         (send loco update-location (send route next))
@@ -174,6 +182,9 @@
               (else
                (route-iter (+ travelled (* delta speed))))))))
       (define (start)
+        (set-loco-speed loco-id speed)
+        (add-loco-speed-listener loco-id loco-speed-changed)
+        (set! last-update (current-milliseconds))
         (route-iter 0))
       (thread start))
 
@@ -182,7 +193,9 @@
     ;; that of a connected segment match those imported through infrabel
     (define starting-spots #f)
     (define/public (get-starting-spots)
-      (hash-keys starting-spots))
+      (if starting-spots
+        (hash-keys starting-spots)
+        '()))
 
     (define (get-updates)
       (for ((db (send infrabel get-detection-block-statuses)))
@@ -221,12 +234,14 @@
 ;; simple struct that defines a spot where a locomotive can be added
 ;; like in the simulator, it needs a track for the train to start on
 ;; and a connected track to determine its direction
+;; only detection blocks are allowed as starting tracks
 (struct starting-spot (previous current))
 (define (find-starting-spots infrabel railway)
   (let* ((db-ids (send infrabel get-detection-block-ids))
          (switch-ids (send infrabel get-switch-ids))
          (infrabel-ids (append db-ids switch-ids))
          (spots (for/list ((track-id (send railway get-detection-block-ids)))
+                  ; first make sure there's a match
                   (and (memq track-id infrabel-ids)
                        (let* ((track (send railway get-track track-id))
                               ; get ids from tracks connected to current track
@@ -239,8 +254,7 @@
                                            ids)))
                          ; create & return starting-spot object if result was a match
                          (and prev
-                              (cons track-id
-                                    (starting-spot prev track-id))))))))
+                              (cons track-id (starting-spot prev track-id))))))))
     (for/hash ((spot (in-list spots))
                #:when spot)
       (values (car spot) (cdr spot)))))
