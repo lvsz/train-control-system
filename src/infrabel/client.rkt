@@ -127,6 +127,6 @@
 
     (define/public (reserve-route loco-id route)
       (get 'reserve-route loco-id route))
-    (define/public (finished-route loco-id)
-      (put 'finished-route loco-id))))
+    (define/public (end-route loco-id)
+      (put 'end-route loco-id))))
 
