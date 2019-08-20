@@ -8,11 +8,11 @@
          racket/random
          rackunit
          rackunit/text-ui
-         "../../setup.rkt"
+         "../../railway/setup.rkt"
          "../../railway/railway.rkt"
          "../../railway/adts.rkt")
 
-(define railway (make-object railway% (get-setup 'hardware)))
+(define railway (make-object railway% 'hardware))
 
 (define basic-tests
   (test-suite

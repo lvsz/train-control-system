@@ -4,14 +4,17 @@
          racket/set
          racket/list
          "adts.rkt"
-         "priority-queue.rkt")
+         "priority-queue.rkt"
+         "setup.rkt")
 
 (provide railway% track? switch? detection-block? same-segment?)
 
 (define railway%
   (class object%
-    (init-field setup)
+    (init-field setup-id)
     (super-new)
+
+    (define setup (get-setup setup-id))
 
     (define nodes (make-hash))
     (define tracks (make-hash))

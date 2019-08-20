@@ -5,23 +5,31 @@
          racket/set
          "route.rkt"
          "loco-controller.rkt"
-         "../railway/railway.rkt"
-         "../setup.rkt")
+         "../railway/railway.rkt")
 
 (provide nmbs%)
 
 ;; METHODS:
 ; initialize
 ; get-loco-ids
-; get-switch-ids
 ; get-detection-block-ids
+; get-switch-ids
 ; get-switch-position
 ; set-switch-position
 ; change-switch-posiiton
 ; add-loco
+; remove-loco
+; get-loco-detection-block
 ; get-loco-speed
 ; set-loco-speed
+; change-loco-direction
 ; get-starting-spots
+; route
+; add-switch-listener
+; add-detection-block-listener
+; add-loco-speed-listener
+; stop
+
 (define nmbs%
   (class object%
     (init-field infrabel)
@@ -152,9 +160,9 @@
       (send infrabel stop)
       (kill-thread (current-thread)))
 
-    (define/public (initialize setup)
-      (set! railway (make-object railway% setup))
-      (send infrabel initialize (send setup get-id))
+    (define/public (initialize setup-id)
+      (set! railway (make-object railway% setup-id))
+      (send infrabel initialize setup-id)
       (send infrabel start)
       ;; add callback to switches to notify listeners & infrabel when changed
       (for ((switch (in-list (send railway get-switches))))

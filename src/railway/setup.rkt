@@ -6,7 +6,7 @@
          racket/string)
 
 (provide setup%
-         setups
+         setup-ids
          get-setup)
 
 
@@ -26,14 +26,17 @@
 (define (make-setup)
   (filter pair? (map string-split (sequence->list (in-lines)))))
 
+(define setup-ids
+  (for/list ((setup-name (in-list setup-names)))
+    (string->symbol setup-name)))
+
 (define setups
-  (map (lambda (name path)
-         (make-object setup%
-                      (string->symbol name)
-                      (lambda ()
-                        (with-input-from-file path make-setup #:mode 'text))))
-       setup-names
-       setup-files))
+  (for/list ((id (in-list setup-ids))
+             (file (in-list setup-files)))
+    (make-object setup%
+                 id
+                 (lambda ()
+                   (with-input-from-file file make-setup #:mode 'text)))))
 
 (define (get-setup setup-id)
   (let ((setup (for/or ((a-setup (in-list setups))

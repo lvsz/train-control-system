@@ -3,7 +3,7 @@
 (require racket/class
          "nmbs/nmbs.rkt"
          "gui.rkt"
-         "setup.rkt"
+         "railway/setup.rkt"
          (prefix-in tcp: "infrabel/client.rkt")
          (prefix-in local: "infrabel/infrabel.rkt"))
 
@@ -38,12 +38,12 @@
   (void
     (cond
       (setup-id
-        (send nmbs initialize (get-setup setup-id))
+        (send nmbs initialize setup-id)
         (new window% (nmbs nmbs)
              (atexit (lambda () (send nmbs stop)))))
       (else
         (new setup-window%
-             (setups setups)
+             (setups setup-ids)
              (callback (lambda (setup)
                          (send nmbs initialize setup)
                          (new window% (nmbs nmbs)

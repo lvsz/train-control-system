@@ -3,7 +3,6 @@
 (require racket/class
          racket/list
          "../railway/railway.rkt"
-         "../setup.rkt"
          (prefix-in z21: "../interface/interface.rkt")
          (prefix-in sim: "../gui_simulator/interface.rkt"))
 
@@ -50,7 +49,7 @@
       (set! ext:get-detection-block-ids (send railway get-detection-block-ids)))
 
     (define/public (initialize setup-id)
-      (set! railway (make-object railway% (get-setup setup-id)))
+      (set! railway (make-object railway% setup-id))
       (if (eq? setup-id 'real-hardware)
         (z21-mode)
         (case setup-id

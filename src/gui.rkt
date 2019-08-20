@@ -266,7 +266,7 @@
     (define setup-panel
       (new choice%
            (label "Current setup")
-           (choices (map (lambda (x) (symbol->string (send x get-id))) setups))
+           (choices (map symbol->string setups))
            (parent parent-panel)
            (vert-margin 20)
            (callback

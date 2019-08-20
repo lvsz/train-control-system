@@ -179,12 +179,12 @@
                     (set b-n1-n2 b-n6-n7 b-n7-n8)))
     (test-case
       "Tracks can tell whether they're part of the same segment"
-      (check-true (send s-n5<n1-n6-n8 same-segment? s-n5<n1-n6))
-      (check-true (send s-n5<n1-n6-n8 same-segment? t-n5-n8))
-      (check-true (send t-n5-n1 same-segment? s-n5<n1-n6-n8))
-      (check-true (send t-n5-n1 same-segment? s-n5<n1-n6))
-      (check-false (send b-n1-n2 same-segment? s-n5<n1-n6))
-      (check-false (send b-n1-n2 same-segment? t-n2-n3)))))
+      (check-true (same-segment? s-n5<n1-n6-n8 s-n5<n1-n6))
+      (check-true (same-segment? s-n5<n1-n6-n8 t-n5-n8))
+      (check-true (same-segment? t-n5-n1 s-n5<n1-n6-n8))
+      (check-true (same-segment? t-n5-n1 s-n5<n1-n6))
+      (check-false (same-segment? b-n1-n2 s-n5<n1-n6))
+      (check-false (same-segment? b-n1-n2 t-n2-n3)))))
 
 
 
