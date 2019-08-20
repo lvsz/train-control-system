@@ -14,8 +14,6 @@
     ;; define direction, changing it if needed
     (define direction
       (let ((dir (send loco get-direction)))
-          (displayln (cons (send route peek-next)
-                           (send loco get-previous-track)))
         (if (same-segment? (send route peek-next)
                            (send loco get-previous-track))
           (begin (send nmbs change-loco-direction loco-id)

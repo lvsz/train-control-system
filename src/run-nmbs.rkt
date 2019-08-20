@@ -1,5 +1,7 @@
 #lang racket/base
 
+(provide run)
+
 (require racket/class
          "nmbs/nmbs.rkt"
          "gui.rkt"
@@ -7,9 +9,7 @@
          (prefix-in tcp: "infrabel/client.rkt")
          (prefix-in local: "infrabel/infrabel.rkt"))
 
-(provide main)
-
-(define (main (setup-id #f) (remote #t))
+(define (run (setup-id #f) (remote #t))
   (let loop ((args (vector->list (current-command-line-arguments))))
     (unless (null? args)
       (case (car args)
@@ -49,4 +49,4 @@
                          (new window% (nmbs nmbs)
                               (atexit (lambda () (send nmbs stop)))))))))))
 
-(main)
+(run)

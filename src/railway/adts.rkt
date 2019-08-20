@@ -225,7 +225,13 @@
     (define/override (custom-write port)
       (write (cons 'detection-block% id) port))))
 
-
+;; extra methods
+; get-position
+; set-position
+; change-position
+; get-tracks
+; set-current-track
+; set-callback
 (define switch%
   (class track%
     (init ((_id id)))

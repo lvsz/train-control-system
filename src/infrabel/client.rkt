@@ -52,11 +52,13 @@
                 (log (format "requesting ~a" msg))
                 (writeln msg out)
                 (flush-output out)
-                (when on-response
+                (if on-response
                   (let ((response (read in)))
-                    (log (format "response for ~a: ~a" msg response))
-                    (on-response response)))
-                (loop))))))
+                    (unless (eof-object? response)
+                      (log (format "response for ~a: ~a" msg response))
+                      (on-response response)
+                      (loop)))
+                  (loop)))))))
 
 ;; send a message over tcp
 (define (put . args)

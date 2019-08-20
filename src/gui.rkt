@@ -292,10 +292,9 @@
     (define buffer-bmp-dc (make-object bitmap-dc% buffer-bmp))
     (define layers '())
     (define timer #f)
-    (define closed #f)
 
     (define/augment (on-close)
-      (set! closed #t)
+      (show #f)
       (atexit))
 
     (define parent-panel
