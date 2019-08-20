@@ -23,11 +23,6 @@
     (define locos (make-hash))
     (define segments #f)
 
-    (define/public (get-node id)
-      (hash-ref nodes id))
-    (define/public (get-nodes)
-      (hash-values nodes))
-
     (define/public (get-track id)
       (hash-ref tracks id))
     (define/public (get-tracks)
@@ -49,10 +44,10 @@
     (define/public (get-detection-block-ids)
       (hash-keys blocks))
 
-    (define/public (get-segment-ids)
-      (hash-keys segments))
     (define/public (get-segments)
       (hash-values segments))
+    (define/public (get-segment-ids)
+      (hash-keys segments))
 
     (define/public (get-loco id)
       (hash-ref locos id))
@@ -64,8 +59,7 @@
       (let* ((prev-segment (get-track prev-segment-id))
              (curr-segment (get-track curr-segment-id))
              (new-loco (make-object loco% id prev-segment curr-segment)))
-        (hash-set! locos id new-loco)
-        new-loco))
+        (hash-set! locos id new-loco)))
     (public (public-add-loco add-loco))
 
     (define/public (remove-loco id)
@@ -75,7 +69,7 @@
       (hash-set! nodes id (make-object node% id)))
     (define (get-or-add-node id)
       (if (hash-has-key? nodes id)
-        (get-node id)
+        (hash-ref nodes id)
         (let ((node (make-object node% id)))
           (hash-set! nodes id node)
           node)))

@@ -29,7 +29,6 @@
 ; add-detection-block-listener
 ; add-loco-speed-listener
 ; stop
-
 (define nmbs%
   (class object%
     (init-field infrabel)
@@ -124,14 +123,15 @@
                       (loop))
                 (else (send route set-route
                             (for/list ((id (in-list all-clear-or-alt)))
-                              (send railway get-track id)))))))))
+                              (send railway get-track id)))
+                      (send route go)))))))
       (define loco-controller
         (new loco-controller%
              (nmbs this)
              (loco loco)
              (route route)
              (on-finish (lambda ()
-                          (send infrabel finished-route loco-id)))))
+                          (send infrabel end-route loco-id)))))
       (send loco-controller start))
 
     ;; get hash of spots where a new loco can be added,

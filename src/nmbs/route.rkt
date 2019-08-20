@@ -17,9 +17,7 @@
       route)
 
     (define/public (set-route new-route)
-      (set! route new-route)
-      (set-switches)
-      this)
+      (set! route new-route))
 
     (define/public (go)
       (set-switches)

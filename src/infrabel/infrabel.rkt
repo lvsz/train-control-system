@@ -11,11 +11,20 @@
 ;; methods
 ; initialize
 ; start
+; stop
+; get-detection-block-ids
+; get-detection-block-statuses
+; get-switch-ids
+; get-switch-position
+; set-switch-position
 ; add-loco
 ; remove-loco
 ; get-loco-speed
 ; set-loco-speed
 ; change-loco-direction
+; get-loco-detection-block
+; reserve-route
+; finish-route
 (define infrabel%
   (class object%
     (super-new)
@@ -50,7 +59,7 @@
 
     (define/public (initialize setup-id)
       (set! railway (make-object railway% setup-id))
-      (if (eq? setup-id 'real-hardware)
+      (if (eq? setup-id 'z21)
         (z21-mode)
         (case setup-id
           ((hardware)             (sim:setup-hardware))
@@ -170,7 +179,7 @@
             (map (lambda (x) (send x get-id)) alt)
             #f))))
 
-    (define/public (finished-route loco-id)
+    (define/public (end-route loco-id)
       (let ((current-db (get-loco-detection-block loco-id)))
         (for (((segment-id loco?) (in-hash segment-reservations))
               #:when (and (eq? loco-id loco?)
