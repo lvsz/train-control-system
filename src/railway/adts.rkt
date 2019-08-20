@@ -77,6 +77,18 @@
 
 ;; in its most basic form, a track is two nodes & the distance in between
 ;; this is however also the superclass for detection blocks & switches
+;; methods
+; get-id
+; get-length
+; get-segment
+; get-segment-id
+; get-current-track
+; from
+; from*
+; get-connected-segments
+; get-connected-tracks
+; get-super-switch
+; switch-override
 (define track%
   (class* object% (writable<%>)
     (init-field id node-1 node-2 length)
@@ -120,13 +132,13 @@
                           (switch? (send track get-segment)))
                    (filter (lambda (p) (connected? this p))
                            (remq track (send (send track get-segment)
-                                             get-positions)))
+                                             get-tracks)))
                    '())))
         (cond ((not fwd) ; no options going forward (dead end)
                rev)
               ((is-a? fwd switch%) ; if next one's a switch, get its options
                (append (filter (lambda (p) (connected? this p))
-                              (send fwd get-positions))
+                              (send fwd get-tracks))
                       rev))
               (else
                (cons fwd rev)))))
@@ -141,7 +153,7 @@
       (flatten (map (lambda (t)
                       (if (is-a? t switch%)
                         (filter (lambda (p) (connected? this p))
-                                (send t get-positions))
+                                (send t get-tracks))
                         t))
                     (get-connected-segments))))
 
@@ -163,6 +175,12 @@
     (define/public (custom-display port)
       (display (send segment get-id) port))))
 
+;; extra methods
+; connect-block
+; get-status
+; set-status
+; occupy
+; clear
 (define detection-block%
   (class track%
     (init ((_id id))
@@ -252,12 +270,12 @@
       (nub (append (send position-1 get-connected-segments)
                    (send position-2 get-connected-segments))))
 
-    (define/public (get-positions)
+    (define/public (get-tracks)
       (flatten (list (if (switch? position-1)
-                       (send position-1 get-positions)
+                       (send position-1 get-tracks)
                        position-1)
                      (if (switch? position-2)
-                       (send position-2 get-positions)
+                       (send position-2 get-tracks)
                        position-2))))
 
     ;; checks whether this switch has a track or any of its subswitches

@@ -144,10 +144,10 @@
                  t-n4-n5))
     (test-case
       "A switch that embeds other switches can access those switches"
-      (check-equal? (list->set (send s-n5<n1-n6 get-positions))
+      (check-equal? (list->set (send s-n5<n1-n6 get-tracks))
                     (set t-n5-n1 t-n5-n6)
                     "Switch s-n5<n1-n6 has 2 positions")
-      (check-equal? (list->set (send s-n5<n1-n6-n8 get-positions))
+      (check-equal? (list->set (send s-n5<n1-n6-n8 get-tracks))
                     (set t-n5-n1 t-n5-n6 t-n5-n8)
                     "Switch s-n5<n1-n6-n8 embeds switch s-n5<n1-n6, so it has 3 positions")
       (send s-n5<n1-n6-n8 set-position 2)
